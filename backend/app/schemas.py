@@ -114,6 +114,111 @@ class AIMemoryIndexResponse(AIMemoryIndexBase):
         from_attributes = True
 
 
+# ╔═════════════════════════════════════════════════════════╗
+# ║  ENDPOINT-SPECIFIC DTOs (Request / Response)           ║
+# ╚═════════════════════════════════════════════════════════╝
+
+# ─────────────────────────────────────────────────────────
+# POST /api/archive/upload — Archive Upload DTOs
+# ─────────────────────────────────────────────────────────
+class ArchiveUploadRequest(BaseModel):
+    """Request body for uploading a new archive item."""
+    owner_id: int = Field(..., description="ID of the user who owns this item")
+    title: str = Field(..., min_length=1, max_length=200, description="Title of the archive item")
+    description: Optional[str] = Field(None, description="Human-readable description of the item")
+    item_type: str = Field("document", description="Type: document, book, photo, video, audio, journal, other")
+    file_url: Optional[str] = Field(None, description="URL or local path to the uploaded file")
+    thumbnail_url: Optional[str] = Field(None, description="URL of the preview thumbnail")
+    tags: Optional[str] = Field("", description="Comma-separated tags, e.g. 'family, 1990s, letters'")
+    metadata_json: Optional[str] = Field(None, description="Arbitrary JSON metadata (author, ISBN, EXIF, etc.)")
+    original_date: Optional[datetime] = Field(None, description="Date the original material was created")
+    source: Optional[str] = Field(None, description="Origin of the material")
+    is_public: bool = Field(True, description="Whether this item is visible to visitors")
+    auto_index: bool = Field(True, description="Automatically generate AI summary & embedding on upload")
+
+class ArchiveUploadResponse(BaseModel):
+    """Response after a successful archive upload."""
+    item: ArchiveItemResponse
+    ai_index_status: str = Field(..., description="'indexed', 'pending', or 'skipped'")
+    message: str
+
+    class Config:
+        from_attributes = True
+
+
+# ─────────────────────────────────────────────────────────
+# GET /api/archive/list — Archive List / Search DTOs
+# ─────────────────────────────────────────────────────────
+class ArchiveListResponse(BaseModel):
+    """Paginated response for archive listing."""
+    items: List[ArchiveItemResponse]
+    total: int
+    skip: int
+    limit: int
+    filters_applied: dict
+
+
+# ─────────────────────────────────────────────────────────
+# POST /api/ai/query — RAG Q&A DTOs
+# ─────────────────────────────────────────────────────────
+class RAGQueryRequest(BaseModel):
+    """Visitor's question sent to the RAG pipeline."""
+    question: str = Field(..., min_length=1, max_length=1000, description="The visitor's question")
+    owner_id: Optional[int] = Field(None, description="Scope search to a specific owner's archive")
+    top_k: int = Field(3, ge=1, le=10, description="Number of context documents to retrieve")
+    language: str = Field("ko", description="Preferred response language: 'ko' or 'en'")
+
+class RAGContextChunk(BaseModel):
+    """A single retrieved context document used to ground the answer."""
+    archive_item_id: int
+    title: str
+    snippet: str = Field(..., description="Relevant excerpt from the archive item")
+    relevance_score: float = Field(..., ge=0.0, le=1.0, description="Semantic similarity score")
+
+class RAGQueryResponse(BaseModel):
+    """LLM-generated answer grounded in retrieved archive context."""
+    answer: str = Field(..., description="AI-generated answer based on archive context")
+    context_used: List[RAGContextChunk] = Field(..., description="Retrieved documents that grounded the answer")
+    model: str = Field(..., description="LLM model used for generation")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Estimated confidence of the answer")
+    disclaimer: str = Field(
+        "이 답변은 아카이브에 보관된 실제 기록을 기반으로 AI가 생성한 것입니다.",
+        description="Legal/ethical disclaimer"
+    )
+
+
+# ─────────────────────────────────────────────────────────
+# POST /api/exhibition/curate — AI Exhibition Curation DTOs
+# ─────────────────────────────────────────────────────────
+class CurationRequest(BaseModel):
+    """Request for AI-curated exhibition scenario generation."""
+    curator_id: int = Field(..., description="ID of the user requesting curation")
+    theme: str = Field(..., min_length=1, max_length=200, description="Exhibition theme, e.g. '1990년대 가족 여행의 기록'")
+    description: Optional[str] = Field(None, description="Additional context or instructions for the AI curator")
+    max_items: int = Field(10, ge=1, le=50, description="Maximum number of items to include")
+    language: str = Field("ko", description="Preferred output language: 'ko' or 'en'")
+
+class CuratedItemSummary(BaseModel):
+    """Summary of an archive item selected for the exhibition."""
+    archive_item_id: int
+    title: str
+    item_type: str
+    ai_curator_note: str = Field(..., description="AI-written commentary for this item in the exhibition context")
+    display_order: int
+    relevance_score: float
+
+class CurationResponse(BaseModel):
+    """AI-generated exhibition scenario."""
+    exhibition_title: str
+    exhibition_subtitle: str
+    exhibition_description: str
+    theme_color: str = Field(..., description="Suggested hex color for the exhibition, e.g. '#6366f1'")
+    curated_items: List[CuratedItemSummary]
+    total_items_reviewed: int
+    model: str = Field(..., description="AI model used for curation")
+    message: str
+
+
 # ─────────────────────────────────────────────────────────
 # Legacy Memory Schemas (backward compatibility)
 # ─────────────────────────────────────────────────────────

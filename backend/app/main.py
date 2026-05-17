@@ -2,15 +2,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app import models
 from app.database import engine
-from app.routers import memories
+from app.routers import memories, archive, ai, exhibition
 
 # Automatically create database tables on startup
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Remembery API",
-    description="Backend API for Remembery, a beautiful full-stack digital memory box application",
-    version="1.0.0"
+    description=(
+        "Backend API for Remembery — The Eternal Digital Library of Human Legacies.\n\n"
+        "**Core Endpoints:**\n"
+        "- `/api/archive` — Upload, search, and manage digital archive items\n"
+        "- `/api/ai` — RAG-powered Q&A with the archived legacy\n"
+        "- `/api/exhibition` — AI-curated online exhibition generation\n"
+        "- `/api/memories` — Legacy memory board (backward compatibility)\n"
+    ),
+    version="2.0.0"
 )
 
 # CORS Configuration for local frontend environments
@@ -30,6 +37,9 @@ app.add_middleware(
 )
 
 # Mount API Routers
+app.include_router(archive.router, prefix="/api")
+app.include_router(ai.router, prefix="/api")
+app.include_router(exhibition.router, prefix="/api")
 app.include_router(memories.router, prefix="/api")
 
 @app.get("/")
@@ -37,5 +47,13 @@ def read_root():
     return {
         "status": "online",
         "app": "Remembery API",
-        "docs_url": "/docs"
+        "version": "2.0.0",
+        "docs_url": "/docs",
+        "endpoints": {
+            "archive": "/api/archive",
+            "ai_query": "/api/ai/query",
+            "exhibition": "/api/exhibition/curate",
+            "memories": "/api/memories",
+        },
     }
+
