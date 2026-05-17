@@ -34,10 +34,13 @@ Remembery goes beyond a simple note-taking app, offering unique features combini
 - 🤖 **True RAG-Based AI Docent**  
   > When a visitor asks a question, the AI answers in the protagonist's tone and manner, strictly based **only on the documents/books/records** they left behind. It provides an intelligent exploration experience that feels like having an intellectual conversation with the deceased, going far beyond simple keyword searches.
 
-- 🏛️ **AI Auto-Curated Exhibition Hall**  
-  > We break away from simple folder structures. The AI automatically curates materials by specific themes or years, generating a beautiful **online media exhibition**. Visitors can walk through the gallery of the protagonist's life milestones.
+- 🏛️ **AI Auto-Curated Exhibition Hall (Multi-Layout & Theme Customizer)**  
+  > We break away from simple folder structures. The AI automatically curates materials by specific themes or years, generating a beautiful **online media exhibition**. Users can customize the **Color Theme** (Classic Taupe, Burgundy, Forest Heritage, Ocean Deep, or Charcoal Midnight) and select the **Exhibition Layout Style** (Docent Timeline, Classic Fine-Art Grid with gold frames, Cinematic Carousel Slideshow, or modern Bento Collage).
 
-- ⏳ **Seamless Alive-to-Legacy Continuity**  
+- ⏳ **Chronological Life Timeline Flow**  
+  > Sorts all archive records chronologically and dynamically evaluates the protagonist's exact age during each life event based on their birth year `1978` (e.g. `2026 (Age 48)`). Users stroll down their timeline with premium native scroll reveals.
+
+- 🔄 **Seamless Alive-to-Legacy Continuity**  
   > **Alive:** Used as a sophisticated 'portfolio and internal library' to visually beautifully organize and share personal experiences and knowledge.  
   > **Legacy:** Without any extra migration work, the entire archive naturally transitions into a 'digital monument' that connects generations, boasting perfect continuity.
 
@@ -169,8 +172,9 @@ Follow these steps to spin up both the backend API and frontend SPA locally.
   - [x] FastAPI + SQLAlchemy + SQLite Boilerplate
   - [x] Onboarding & Dynamic Legacy Profile Expansion
   - [x] Archive Item Rich Previews (AI Summary, Quotes)
+  - [x] Life Legacy Chronological Timeline Flow (TimelineFlow)
+  - [x] AI Auto-Curated Exhibition Hall (Custom Themes & Layouts)
   - [ ] AI Docent (RAG) Q&A integration
-  - [ ] AI Auto-Curated Exhibition Hall (Virtual 3D Layouts)
 
 ---
 
