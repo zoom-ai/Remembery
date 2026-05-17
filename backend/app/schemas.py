@@ -108,6 +108,9 @@ class ArchiveItemBase(BaseModel):
     metadata_json: Optional[str] = None
     original_date: Optional[datetime] = None
     source: Optional[str] = None
+    ai_summary: Optional[str] = None
+    highlight_quote: Optional[str] = None
+    preview_url: Optional[str] = None
     is_public: Optional[bool] = True
 
 class ArchiveItemCreate(ArchiveItemBase):

@@ -199,6 +199,9 @@ class ArchiveItem(Base):
     metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Flexible JSON blob (author, ISBN, EXIF, etc.)
     original_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Date the original material was created
     source: Mapped[Optional[str]]   = mapped_column(String(300), nullable=True)  # Where the item came from
+    ai_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # AI core summary
+    highlight_quote: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # Highlight quote from text/book
+    preview_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True) # Thumbnail or 3sec GIF
 
     # Lifecycle
     is_public: Mapped[bool]         = mapped_column(Boolean, default=True)
