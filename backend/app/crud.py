@@ -25,6 +25,22 @@ def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
 def get_owner(db: Session) -> Optional[models.User]:
     return db.query(models.User).filter(models.User.role == "owner").first()
 
+def add_timeline_event(db: Session, owner: models.User, req: schemas.TimelineEventCreate) -> models.User:
+    current_timeline = owner.timeline_json or []
+    # Using list conversion just in case to avoid mutability issues with SQLAlchemy JSON type
+    new_timeline = list(current_timeline)
+    new_timeline.append({"year": req.year, "event": req.event, "icon": req.icon})
+    owner.timeline_json = new_timeline
+    
+    # We must explicitly use flag_modified for JSON columns in SQLAlchemy when mutating in place 
+    # But since we're re-assigning it, it should trigger the update. Still good practice:
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(owner, "timeline_json")
+    
+    db.commit()
+    db.refresh(owner)
+    return owner
+
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     db_user = models.User(
         email=user.email,

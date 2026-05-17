@@ -36,3 +36,18 @@ def onboard_owner(payload: schemas.OnboardingRequest, db: Session = Depends(get_
     
     owner = crud.create_owner(db, payload)
     return owner
+
+@router.post("/timeline", response_model=schemas.UserResponse, summary="Add a new event to the owner's timeline")
+def add_timeline_event(payload: schemas.TimelineEventCreate, db: Session = Depends(get_db)):
+    """
+    Appends a new timeline event to the owner's timeline_json array.
+    """
+    owner = crud.get_owner(db)
+    if not owner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Owner not found. Onboarding is required."
+        )
+    
+    updated_owner = crud.add_timeline_event(db, owner, payload)
+    return updated_owner

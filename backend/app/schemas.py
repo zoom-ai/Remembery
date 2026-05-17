@@ -29,6 +29,11 @@ class OnboardingRequest(BaseModel):
     bio: Optional[str] = None
     timeline_json: Optional[list] = None
 
+class TimelineEventCreate(BaseModel):
+    year: str = Field(..., min_length=1, max_length=20)
+    event: str = Field(..., min_length=1, max_length=200)
+    icon: Optional[str] = "🌱"
+
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=128)
 

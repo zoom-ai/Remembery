@@ -34,6 +34,12 @@ export interface OnboardingRequest {
   timeline_json?: any[]
 }
 
+export interface TimelineEvent {
+  year: string
+  event: string
+  icon?: string
+}
+
 export interface Category {
   id: number
   user_id: number | null
@@ -182,6 +188,10 @@ export const userAPI = {
   },
   onboard: async (data: OnboardingRequest) => {
     const res = await API.post<User>('/users/onboard', data)
+    return res.data
+  },
+  addTimelineEvent: async (data: TimelineEvent) => {
+    const res = await API.post<User>('/users/timeline', data)
     return res.data
   }
 }

@@ -7,21 +7,24 @@
 import { useState } from 'react'
 import {
   Search, Loader2, Quote, Calendar,
-  Sparkles, ChevronRight, MessageCircle, X,
+  Sparkles, ChevronRight, MessageCircle, X, Plus
 } from 'lucide-react'
 import { aiAPI, type RAGQueryResponse } from '../services/api'
+import TimelineModal from './TimelineModal'
 
 import { type User } from '../services/api'
 
 interface Props {
   owner: User
+  onTimelineUpdate: () => void
 }
 
-export default function MainDashboard({ owner }: Props) {
+export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
   const [question, setQuestion] = useState('')
   const [isQuerying, setIsQuerying] = useState(false)
   const [ragResult, setRagResult] = useState<RAGQueryResponse | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
+  const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false)
 
   const handleAskDocent = async () => {
     if (!question.trim()) return
@@ -189,9 +192,17 @@ export default function MainDashboard({ owner }: Props) {
 
       {/* ═══════ 연혁 타임라인 ═══════ */}
       <section>
-        <div className="flex items-center gap-3 mb-6">
-          <Calendar className="w-5 h-5 text-[var(--umber)]" />
-          <h2 className="font-display text-2xl font-semibold text-[var(--charcoal)]">연혁 타임라인</h2>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-5 h-5 text-[var(--umber)]" />
+            <h2 className="font-display text-2xl font-semibold text-[var(--charcoal)]">연혁 타임라인</h2>
+          </div>
+          <button
+            onClick={() => setIsTimelineModalOpen(true)}
+            className="text-sm font-semibold text-[var(--umber)] bg-[var(--umber)]/10 hover:bg-[var(--umber)]/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+          >
+            <Plus className="w-4 h-4" /> 연혁 추가
+          </button>
         </div>
 
         <div className="relative pl-8 stagger-children">
@@ -219,6 +230,14 @@ export default function MainDashboard({ owner }: Props) {
           )}
         </div>
       </section>
+
+      {/* Timeline Modal */}
+      {isTimelineModalOpen && (
+        <TimelineModal 
+          onClose={() => setIsTimelineModalOpen(false)} 
+          onSuccess={onTimelineUpdate} 
+        />
+      )}
     </div>
   )
 }
