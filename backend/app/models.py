@@ -1,16 +1,19 @@
 """
 Remembery — Core Data Models
 =============================
-Defines the four primary entities that power the Remembery digital archive:
+Defines the five primary entities that power the Remembery digital archive:
 
-  User  ─┬──<  ArchiveItem  ──  AIMemoryIndex   (1:1)
+  User  ─┬──<  Category
+          │        └──<  ArchiveItem  ──  AIMemoryIndex   (1:1)
           │
           └──<  Exhibition  >──< ArchiveItem     (M:N via association)
 
 Relationships
 ─────────────
+• User          1 ──── N  Category       (creator of custom library categories)
 • User          1 ──── N  ArchiveItem    (owner of uploaded archives)
 • User          1 ──── N  Exhibition     (curator of exhibitions)
+• Category      1 ──── N  ArchiveItem    (each item belongs to one category)
 • ArchiveItem   1 ──── 1  AIMemoryIndex  (each item has one AI embedding record)
 • Exhibition    M ──── N  ArchiveItem    (exhibitions contain many items, items can appear in many exhibitions)
 """
@@ -104,30 +107,82 @@ class User(Base):
     exhibitions: Mapped[List["Exhibition"]] = relationship(
         "Exhibition", back_populates="curator", cascade="all, delete-orphan", lazy="selectin"
     )
+    categories: Mapped[List["Category"]] = relationship(
+        "Category", back_populates="creator", cascade="all, delete-orphan", lazy="selectin"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email='{self.email}', role='{self.role}')>"
 
 
 # ─────────────────────────────────────────────────────────
-# 2. ArchiveItem — 디지털 자료 (문서, 도서, 사진, 동영상 등)
+# 2. Category — 사용자 커스텀 라이브러리 카테고리
+# ─────────────────────────────────────────────────────────
+class Category(Base):
+    """
+    A user-defined or system-default library category.
+
+    Users can create custom categories (e.g. '연구 논문', '가족 편지',
+    '골프 스코어카드') to organise their archive items flexibly.
+    System defaults (사진, 문서, 동영상, etc.) are seeded with
+    is_default=True and belong to no specific user.
+    """
+    __tablename__ = "categories"
+
+    id: Mapped[int]                 = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[Optional[int]]  = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )  # NULL for system-default categories
+
+    name: Mapped[str]               = mapped_column(String(100), index=True, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    icon: Mapped[Optional[str]]     = mapped_column(String(50), nullable=True)   # e.g. "FileText", "Camera", "BookOpen"
+    color: Mapped[Optional[str]]    = mapped_column(String(7), nullable=True)    # Hex color e.g. "#f59e0b"
+    is_default: Mapped[bool]        = mapped_column(Boolean, default=False)
+
+    # Lifecycle
+    created_at: Mapped[datetime]    = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime]    = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # ── Relationships ────────────────────────────────────
+    creator: Mapped[Optional["User"]] = relationship("User", back_populates="categories")
+
+    archive_items: Mapped[List["ArchiveItem"]] = relationship(
+        "ArchiveItem", back_populates="category", lazy="selectin"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Category(id={self.id}, name='{self.name}', default={self.is_default})>"
+
+
+# ─────────────────────────────────────────────────────────
+# 3. ArchiveItem — 디지털 자료 (문서, 도서, 사진, 동영상 등)
 # ─────────────────────────────────────────────────────────
 class ArchiveItem(Base):
     """
     A single unit of preserved digital material.
 
     Stores the file reference (URL or local path), descriptive metadata,
-    and links to its owner and any exhibitions it participates in.
+    and links to its owner, category, and any exhibitions it participates in.
+
+    Classification:
+      • category_id (FK) — Primary classification via the Category table.
+      • item_type (str)  — Deprecated legacy field, kept for backward
+                           compatibility during migration. New code should
+                           use category_id exclusively.
     """
     __tablename__ = "archive_items"
 
     id: Mapped[int]                 = mapped_column(Integer, primary_key=True, index=True)
     owner_id: Mapped[int]           = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    category_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # New: references the Category table
 
     # Core content fields
     title: Mapped[str]              = mapped_column(String(200), index=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    item_type: Mapped[str]          = mapped_column(String(20), default=ArchiveItemType.DOCUMENT.value, index=True)
+    item_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)  # Deprecated: use category_id
     file_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)  # S3 / local file path
     thumbnail_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
@@ -144,6 +199,7 @@ class ArchiveItem(Base):
 
     # ── Relationships ────────────────────────────────────
     owner: Mapped["User"] = relationship("User", back_populates="archive_items")
+    category: Mapped[Optional["Category"]] = relationship("Category", back_populates="archive_items")
 
     exhibitions: Mapped[List["Exhibition"]] = relationship(
         "Exhibition", secondary=exhibition_items, back_populates="items", lazy="selectin"
@@ -154,11 +210,12 @@ class ArchiveItem(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<ArchiveItem(id={self.id}, title='{self.title}', type='{self.item_type}')>"
+        cat = self.category.name if self.category else self.item_type
+        return f"<ArchiveItem(id={self.id}, title='{self.title}', category='{cat}')>"
 
 
 # ─────────────────────────────────────────────────────────
-# 3. Exhibition — 온라인 전시회 정보
+# 4. Exhibition — 온라인 전시회 정보
 # ─────────────────────────────────────────────────────────
 class Exhibition(Base):
     """
@@ -205,7 +262,7 @@ class Exhibition(Base):
 
 
 # ─────────────────────────────────────────────────────────
-# 4. AIMemoryIndex — AI 임베딩 값 및 요약본 (RAG 구현용)
+# 5. AIMemoryIndex — AI 임베딩 값 및 요약본 (RAG 구현용)
 # ─────────────────────────────────────────────────────────
 class AIMemoryIndex(Base):
     """

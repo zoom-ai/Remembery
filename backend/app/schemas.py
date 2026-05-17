@@ -32,12 +32,35 @@ class UserResponse(UserBase):
 
 
 # ─────────────────────────────────────────────────────────
+# Category Schemas
+# ─────────────────────────────────────────────────────────
+class CategoryBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+
+class CategoryCreate(CategoryBase):
+    user_id: Optional[int] = Field(None, description="NULL for system-default categories")
+    is_default: bool = False
+
+class CategoryResponse(CategoryBase):
+    id: int
+    user_id: Optional[int] = None
+    is_default: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# ─────────────────────────────────────────────────────────
 # ArchiveItem Schemas
 # ─────────────────────────────────────────────────────────
 class ArchiveItemBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    item_type: Optional[str] = "document"
+    item_type: Optional[str] = None  # Deprecated: use category_id
+    category_id: Optional[int] = None
     file_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
     tags: Optional[str] = ""
@@ -52,6 +75,7 @@ class ArchiveItemCreate(ArchiveItemBase):
 class ArchiveItemResponse(ArchiveItemBase):
     id: int
     owner_id: int
+    category_name: Optional[str] = None  # Denormalised for convenience
     created_at: datetime
     updated_at: datetime
 
@@ -126,7 +150,8 @@ class ArchiveUploadRequest(BaseModel):
     owner_id: int = Field(..., description="ID of the user who owns this item")
     title: str = Field(..., min_length=1, max_length=200, description="Title of the archive item")
     description: Optional[str] = Field(None, description="Human-readable description of the item")
-    item_type: str = Field("document", description="Type: document, book, photo, video, audio, journal, other")
+    category_id: Optional[int] = Field(None, description="Category ID from the categories table")
+    item_type: Optional[str] = Field(None, description="Deprecated: use category_id instead")
     file_url: Optional[str] = Field(None, description="URL or local path to the uploaded file")
     thumbnail_url: Optional[str] = Field(None, description="URL of the preview thumbnail")
     tags: Optional[str] = Field("", description="Comma-separated tags, e.g. 'family, 1990s, letters'")

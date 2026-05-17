@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app import models
 from app.database import engine
-from app.routers import memories, archive, ai, exhibition
+from app.routers import memories, archive, ai, exhibition, category
 
 # Automatically create database tables on startup
 models.Base.metadata.create_all(bind=engine)
@@ -40,6 +40,7 @@ app.add_middleware(
 app.include_router(archive.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 app.include_router(exhibition.router, prefix="/api")
+app.include_router(category.router, prefix="/api")
 app.include_router(memories.router, prefix="/api")
 
 @app.get("/")

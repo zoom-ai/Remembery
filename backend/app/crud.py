@@ -46,12 +46,57 @@ def delete_user(db: Session, user_id: int) -> bool:
 
 
 # ═════════════════════════════════════════════════════════
+# Category CRUD
+# ═════════════════════════════════════════════════════════
+def get_categories(db: Session, user_id: Optional[int] = None, include_defaults: bool = True) -> List[models.Category]:
+    """Get categories. If user_id is specified, returns that user's custom categories.
+    If include_defaults is True (default), system defaults are always included."""
+    query = db.query(models.Category)
+    if user_id is not None and include_defaults:
+        query = query.filter(
+            (models.Category.user_id == user_id) | (models.Category.is_default == True)  # noqa: E712
+        )
+    elif user_id is not None:
+        query = query.filter(models.Category.user_id == user_id)
+    elif include_defaults:
+        query = query.filter(models.Category.is_default == True)  # noqa: E712
+    return query.order_by(models.Category.is_default.desc(), models.Category.name).all()
+
+def get_category(db: Session, category_id: int) -> Optional[models.Category]:
+    return db.query(models.Category).filter(models.Category.id == category_id).first()
+
+def create_category(db: Session, category: schemas.CategoryCreate) -> models.Category:
+    db_category = models.Category(
+        user_id=category.user_id,
+        name=category.name,
+        description=category.description,
+        icon=category.icon,
+        color=category.color,
+        is_default=category.is_default,
+    )
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    return db_category
+
+def delete_category(db: Session, category_id: int) -> bool:
+    db_cat = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if db_cat:
+        db.delete(db_cat)
+        db.commit()
+        return True
+    return False
+
+
+# ═════════════════════════════════════════════════════════
 # ArchiveItem CRUD
 # ═════════════════════════════════════════════════════════
-def get_archive_items(db: Session, skip: int = 0, limit: int = 100, owner_id: Optional[int] = None) -> List[models.ArchiveItem]:
+def get_archive_items(db: Session, skip: int = 0, limit: int = 100, owner_id: Optional[int] = None, category_id: Optional[int] = None) -> List[models.ArchiveItem]:
     query = db.query(models.ArchiveItem)
     if owner_id:
         query = query.filter(models.ArchiveItem.owner_id == owner_id)
+    if category_id:
+        query = query.filter(models.ArchiveItem.category_id == category_id)
     return query.order_by(models.ArchiveItem.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_archive_item(db: Session, item_id: int) -> Optional[models.ArchiveItem]:
@@ -60,9 +105,10 @@ def get_archive_item(db: Session, item_id: int) -> Optional[models.ArchiveItem]:
 def create_archive_item(db: Session, item: schemas.ArchiveItemCreate) -> models.ArchiveItem:
     db_item = models.ArchiveItem(
         owner_id=item.owner_id,
+        category_id=item.category_id,
         title=item.title,
         description=item.description,
-        item_type=item.item_type,
+        item_type=item.item_type,  # Deprecated fallback
         file_url=item.file_url,
         thumbnail_url=item.thumbnail_url,
         tags=item.tags,

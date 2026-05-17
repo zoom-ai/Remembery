@@ -20,6 +20,13 @@ router = APIRouter(
 )
 
 
+def _item_to_response(item: models.ArchiveItem) -> schemas.ArchiveItemResponse:
+    """Build ArchiveItemResponse with denormalised category_name."""
+    data = schemas.ArchiveItemResponse.model_validate(item)
+    if item.category:
+        data.category_name = item.category.name
+    return data
+
 # ─────────────────────────────────────────────────────────
 # POST /upload — Upload & register a new archive item
 # ─────────────────────────────────────────────────────────
@@ -48,6 +55,7 @@ def upload_archive_item(
     # 2. Create the ArchiveItem record
     item_schema = schemas.ArchiveItemCreate(
         owner_id=payload.owner_id,
+        category_id=payload.category_id,
         title=payload.title,
         description=payload.description,
         item_type=payload.item_type,
@@ -81,7 +89,7 @@ def upload_archive_item(
     db_item = crud.get_archive_item(db, db_item.id)
 
     return schemas.ArchiveUploadResponse(
-        item=schemas.ArchiveItemResponse.model_validate(db_item),
+        item=_item_to_response(db_item),
         ai_index_status=ai_index_status,
         message=f"Archive item '{db_item.title}' uploaded successfully.",
     )
@@ -100,7 +108,8 @@ def upload_archive_item(
 )
 def list_archive_items(
     q: Optional[str] = Query(None, description="Keyword search across title, description, tags"),
-    item_type: Optional[str] = Query(None, description="Filter by item type (document, photo, video, etc.)"),
+    item_type: Optional[str] = Query(None, description="Filter by legacy item type (deprecated)"),
+    category_id: Optional[int] = Query(None, description="Filter by category ID"),
     owner_id: Optional[int] = Query(None, description="Filter by owner user ID"),
     is_public: Optional[bool] = Query(None, description="Filter by public visibility"),
     skip: int = Query(0, ge=0, description="Pagination offset"),
@@ -113,6 +122,8 @@ def list_archive_items(
     # Apply filters
     if owner_id is not None:
         query = query.filter(models.ArchiveItem.owner_id == owner_id)
+    if category_id is not None:
+        query = query.filter(models.ArchiveItem.category_id == category_id)
     if item_type is not None:
         query = query.filter(models.ArchiveItem.item_type == item_type)
     if is_public is not None:
@@ -143,13 +154,14 @@ def list_archive_items(
     )
 
     return schemas.ArchiveListResponse(
-        items=[schemas.ArchiveItemResponse.model_validate(item) for item in items],
+        items=[_item_to_response(item) for item in items],
         total=total,
         skip=skip,
         limit=limit,
         filters_applied={
             "q": q,
             "item_type": item_type,
+            "category_id": category_id,
             "owner_id": owner_id,
             "is_public": is_public,
         },
