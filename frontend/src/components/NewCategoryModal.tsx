@@ -106,7 +106,7 @@ export default function NewCategoryModal({ userId, onCreated, onClose }: Props) 
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-[var(--taupe)] mb-1.5">
               색상 태그
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {COLOR_SWATCHES.map(c => (
                 <button
                   key={c}
@@ -116,6 +116,28 @@ export default function NewCategoryModal({ userId, onCreated, onClose }: Props) 
                   style={{ backgroundColor: c }}
                 />
               ))}
+              
+              {/* Custom Color Picker Swatch */}
+              <div
+                className={`relative w-7 h-7 rounded-full border border-[var(--linen)] hover:scale-105 transition-all flex items-center justify-center cursor-pointer overflow-hidden
+                  ${!COLOR_SWATCHES.includes(color) ? 'ring-2 ring-offset-2 ring-[var(--charcoal)] scale-110' : ''}`}
+                style={{
+                  background: !COLOR_SWATCHES.includes(color)
+                    ? color
+                    : 'linear-gradient(135deg, #ff0055 0%, #00ffcc 50%, #9900ff 100%)'
+                }}
+                title="커스텀 색상 선택"
+              >
+                <input
+                  type="color"
+                  value={color}
+                  onChange={e => setColor(e.target.value)}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                {COLOR_SWATCHES.includes(color) && (
+                  <span className="text-[10px] font-bold text-white drop-shadow-sm pointer-events-none">+</span>
+                )}
+              </div>
             </div>
           </div>
 
