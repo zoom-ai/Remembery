@@ -168,6 +168,7 @@ Follow these steps to spin up both the backend API and frontend SPA locally.
   - [x] React 19 + Tailwind v4 Responsive Glassmorphism Dashboard
   - [x] FastAPI + SQLAlchemy + SQLite Boilerplate
   - [x] Onboarding & Dynamic Legacy Profile Expansion
+  - [x] Archive Item Rich Previews (AI Summary, Quotes)
   - [ ] AI Docent (RAG) Q&A integration
   - [ ] AI Auto-Curated Exhibition Hall (Virtual 3D Layouts)
 

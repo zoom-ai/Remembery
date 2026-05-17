@@ -168,6 +168,7 @@ Remembery는 프론트엔드와 백엔드가 완전히 디커플링된 구조로
   - [x] React 19 + Tailwind v4 기반 대시보드 UI 개발
   - [x] FastAPI + SQLite 기반 백엔드 CRUD 설계 및 API 연동
   - [x] 온보딩 시스템 및 프로필 확장 메타데이터 구축
+  - [x] 자료 미리보기(Rich Preview) 관련 데이터 필드 추가 (AI 요약, 핵심 인용구, 미리보기 URL)
   - [ ] LlamaIndex / Gemini API 연동 RAG 시스템 개발 (Q&A 봇)
   - [ ] Three.js 활용 AI 큐레이팅 기반 3D 가상 전시관 구현
 
