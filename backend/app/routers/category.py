@@ -4,6 +4,7 @@ Remembery — Category Router
 POST   /api/categories        → Create a new custom category
 GET    /api/categories        → List categories (system defaults + user custom)
 GET    /api/categories/{id}   → Get a single category
+PATCH  /api/categories/{id}   → Update category name, description, icon, color
 DELETE /api/categories/{id}   → Delete a custom category (system defaults are protected)
 POST   /api/categories/seed   → Seed default system categories (dev/setup utility)
 """
@@ -95,6 +96,51 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
     return cat
+
+
+# ─────────────────────────────────────────────────────────
+# PATCH /{category_id} — Update a category
+# ─────────────────────────────────────────────────────────
+@router.patch(
+    "/{category_id}",
+    response_model=schemas.CategoryResponse,
+    summary="Update a category (name, description, icon, color)",
+    description="Partial update — only fields included in the request body "
+                "will be modified. System default category names are protected "
+                "from renaming, but description/icon/color can still be changed.",
+)
+def update_category(
+    category_id: int,
+    payload: schemas.CategoryUpdate,
+    db: Session = Depends(get_db),
+):
+    cat = crud.get_category(db, category_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    # Protect system default category names from renaming
+    if cat.is_default and payload.name is not None and payload.name != cat.name:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System default category names cannot be renamed. "
+                   "You can update description, icon, and color.",
+        )
+
+    # Check for duplicate name under the same user scope
+    if payload.name is not None and payload.name != cat.name:
+        existing = db.query(models.Category).filter(
+            models.Category.name == payload.name,
+            models.Category.user_id == cat.user_id,
+            models.Category.id != category_id,
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Category '{payload.name}' already exists for this user.",
+            )
+
+    updated = crud.update_category(db, category_id, payload)
+    return updated
 
 
 # ─────────────────────────────────────────────────────────

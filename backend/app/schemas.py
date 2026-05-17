@@ -44,6 +44,13 @@ class CategoryCreate(CategoryBase):
     user_id: Optional[int] = Field(None, description="NULL for system-default categories")
     is_default: bool = False
 
+class CategoryUpdate(BaseModel):
+    """Partial update schema — all fields optional."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+
 class CategoryResponse(CategoryBase):
     id: int
     user_id: Optional[int] = None

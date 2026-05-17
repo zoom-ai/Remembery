@@ -79,6 +79,17 @@ def create_category(db: Session, category: schemas.CategoryCreate) -> models.Cat
     db.refresh(db_category)
     return db_category
 
+def update_category(db: Session, category_id: int, update_data: schemas.CategoryUpdate) -> Optional[models.Category]:
+    db_cat = db.query(models.Category).filter(models.Category.id == category_id).first()
+    if not db_cat:
+        return None
+    update_dict = update_data.model_dump(exclude_unset=True)
+    for field, value in update_dict.items():
+        setattr(db_cat, field, value)
+    db.commit()
+    db.refresh(db_cat)
+    return db_cat
+
 def delete_category(db: Session, category_id: int) -> bool:
     db_cat = db.query(models.Category).filter(models.Category.id == category_id).first()
     if db_cat:

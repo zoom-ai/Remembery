@@ -72,12 +72,33 @@ def upload_archive_item(
     # 3. Optionally create an AIMemoryIndex stub for future embedding
     ai_index_status = "skipped"
     if payload.auto_index:
-        # Create a placeholder index — the actual embedding will be filled
-        # asynchronously by a background worker or on-demand via /api/ai/...
+        # Resolve category name for context enrichment
+        category_label = ""
+        if db_item.category_id:
+            cat = crud.get_category(db, db_item.category_id)
+            if cat:
+                category_label = cat.name
+
+        # Build context-enriched summary that tells the RAG engine
+        # which category this item belongs to
+        context_prefix = (
+            f"[카테고리: {category_label}] " if category_label else ""
+        )
+        enriched_summary = (
+            f"{context_prefix}"
+            f"[Pending] Auto-summary for: {db_item.title}"
+        )
+
+        # Prepend category as a topic for semantic retrieval
+        base_topics = payload.tags or ""
+        enriched_topics = (
+            f"{category_label}, {base_topics}" if category_label else base_topics
+        )
+
         ai_index_schema = schemas.AIMemoryIndexCreate(
             archive_item_id=db_item.id,
-            summary=f"[Pending] Auto-summary for: {db_item.title}",
-            key_topics=payload.tags or "",
+            summary=enriched_summary,
+            key_topics=enriched_topics,
             embedding_vector=None,
             embedding_model=None,
             embedding_dim=None,
