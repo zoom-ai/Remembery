@@ -16,18 +16,37 @@ class UserBase(BaseModel):
     email: str = Field(..., min_length=5, max_length=255)
     display_name: str = Field(..., min_length=1, max_length=100)
     role: Optional[str] = "visitor"
-    subtitle: Optional[str] = None
+    subtitle: Optional[str] = None # Deprecated
     title: Optional[str] = None
     bio: Optional[str] = None
+    birth_date: Optional[str] = None
+    death_date: Optional[str] = None
+    birth_place: Optional[str] = None
+    resting_place: Optional[str] = None
+    motto: Optional[str] = None
     timeline_json: Optional[list] = None
     avatar_url: Optional[str] = None
 
 class OnboardingRequest(BaseModel):
     display_name: str
-    subtitle: Optional[str] = None
     title: Optional[str] = None
     bio: Optional[str] = None
+    birth_date: Optional[str] = None
+    death_date: Optional[str] = None
+    birth_place: Optional[str] = None
+    resting_place: Optional[str] = None
+    motto: Optional[str] = None
     timeline_json: Optional[list] = None
+
+class UserProfileUpdate(BaseModel):
+    display_name: Optional[str] = None
+    title: Optional[str] = None
+    bio: Optional[str] = None
+    birth_date: Optional[str] = None
+    death_date: Optional[str] = None
+    birth_place: Optional[str] = None
+    resting_place: Optional[str] = None
+    motto: Optional[str] = None
 
 class TimelineEventCreate(BaseModel):
     year: str = Field(..., min_length=1, max_length=20)

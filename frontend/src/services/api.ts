@@ -20,6 +20,11 @@ export interface User {
   subtitle: string | null
   title: string | null
   bio: string | null
+  birth_date: string | null
+  death_date: string | null
+  birth_place: string | null
+  resting_place: string | null
+  motto: string | null
   timeline_json: any[] | null
   avatar_url: string | null
   is_active: boolean
@@ -28,10 +33,25 @@ export interface User {
 
 export interface OnboardingRequest {
   display_name: string
-  subtitle?: string
   title?: string
   bio?: string
+  birth_date?: string
+  death_date?: string
+  birth_place?: string
+  resting_place?: string
+  motto?: string
   timeline_json?: any[]
+}
+
+export interface UserProfileUpdate {
+  display_name?: string
+  title?: string
+  bio?: string
+  birth_date?: string
+  death_date?: string
+  birth_place?: string
+  resting_place?: string
+  motto?: string
 }
 
 export interface TimelineEvent {
@@ -192,6 +212,16 @@ export const userAPI = {
   },
   addTimelineEvent: async (data: TimelineEvent) => {
     const res = await API.post<User>('/users/timeline', data)
+    return res.data
+  },
+  updateOwner: async (data: UserProfileUpdate) => {
+    const res = await API.patch<User>('/users/owner', data)
+    return res.data
+  },
+  uploadAvatar: async (formData: FormData) => {
+    const res = await API.post<User>('/users/owner/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return res.data
   }
 }

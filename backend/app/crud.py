@@ -64,15 +64,41 @@ def create_owner(db: Session, req: schemas.OnboardingRequest) -> models.User:
         display_name=req.display_name,
         hashed_password="not_used_locally",
         role="owner",
-        subtitle=req.subtitle,
         title=req.title,
         bio=req.bio,
+        birth_date=req.birth_date,
+        death_date=req.death_date,
+        birth_place=req.birth_place,
+        resting_place=req.resting_place,
+        motto=req.motto,
         timeline_json=req.timeline_json,
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
+
+def update_owner(db: Session, owner: models.User, req: schemas.UserProfileUpdate) -> models.User:
+    if req.display_name is not None:
+        owner.display_name = req.display_name
+    if req.title is not None:
+        owner.title = req.title
+    if req.bio is not None:
+        owner.bio = req.bio
+    if req.birth_date is not None:
+        owner.birth_date = req.birth_date
+    if req.death_date is not None:
+        owner.death_date = req.death_date
+    if req.birth_place is not None:
+        owner.birth_place = req.birth_place
+    if req.resting_place is not None:
+        owner.resting_place = req.resting_place
+    if req.motto is not None:
+        owner.motto = req.motto
+        
+    db.commit()
+    db.refresh(owner)
+    return owner
 
 def delete_user(db: Session, user_id: int) -> bool:
     db_user = db.query(models.User).filter(models.User.id == user_id).first()

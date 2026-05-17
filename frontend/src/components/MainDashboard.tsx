@@ -7,10 +7,11 @@
 import { useState } from 'react'
 import {
   Search, Loader2, Quote, Calendar,
-  Sparkles, ChevronRight, MessageCircle, X, Plus
+  Sparkles, ChevronRight, MessageCircle, X, Plus, Edit2, MapPin
 } from 'lucide-react'
 import { aiAPI, type RAGQueryResponse } from '../services/api'
 import TimelineModal from './TimelineModal'
+import ProfileEditModal from './ProfileEditModal'
 
 import { type User } from '../services/api'
 
@@ -25,6 +26,7 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
   const [ragResult, setRagResult] = useState<RAGQueryResponse | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
   const handleAskDocent = async () => {
     if (!question.trim()) return
@@ -159,24 +161,75 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
       {/* ═══════ 프로필 카드 ═══════ */}
       <section className="rounded-2xl museum-card overflow-hidden">
         <div className="h-24 bg-gradient-to-r from-[var(--museum)] via-[var(--umber)] to-[var(--museum)]" />
-        <div className="px-8 pb-8 -mt-10 relative">
-          <div className="w-20 h-20 rounded-2xl bg-[var(--linen)] border-4 border-[var(--ivory)] flex items-center justify-center shadow-lg">
-            <span className="font-display text-2xl font-semibold text-[var(--museum)]">
-              {owner.display_name.slice(-2)}
-            </span>
-          </div>
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 relative px-8 pt-6">
+          <button 
+            onClick={() => setIsProfileModalOpen(true)}
+            className="absolute top-0 right-0 p-2 text-[var(--taupe)] hover:text-[var(--umber)] hover:bg-[var(--umber)]/10 rounded-full transition-colors"
+            title="프로필 수정"
+          >
+            <Edit2 className="w-5 h-5" />
+          </button>
 
-          <div className="mt-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div>
+          <div className="w-20 h-20 rounded-2xl bg-[var(--linen)] border-4 border-[var(--ivory)] flex items-center justify-center shadow-lg overflow-hidden flex-shrink-0">
+            {owner.avatar_url ? (
+              <img src={`http://localhost:8000${owner.avatar_url}`} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-display text-2xl font-semibold text-[var(--museum)]">
+                {owner.display_name.slice(-2)}
+              </span>
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-1">
               <h1 className="font-display text-3xl sm:text-4xl font-semibold text-[var(--charcoal)] tracking-tight">
                 {owner.display_name}
               </h1>
-              {owner.subtitle && <p className="text-sm text-[var(--taupe)] mt-0.5">{owner.subtitle}</p>}
-              {owner.title && <p className="font-display text-lg italic text-[var(--umber)] mt-1">{owner.title}</p>}
-              {owner.bio && <p className="text-sm text-[var(--graphite)] mt-3 max-w-xl leading-relaxed">{owner.bio}</p>}
+              {(owner.birth_date || owner.death_date || owner.subtitle) && (
+                <span className="text-sm font-medium px-2.5 py-1 rounded-full bg-[var(--linen)] text-[var(--graphite)]">
+                  {owner.birth_date ? `${owner.birth_date} - ${owner.death_date || ''}` : owner.subtitle}
+                </span>
+              )}
             </div>
+            {owner.title && (
+              <p className="text-lg text-[var(--taupe)] mt-1">{owner.title}</p>
+            )}
+            
+            {/* Extended Info */}
+            {(owner.birth_place || owner.resting_place) && (
+              <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-[var(--taupe)]">
+                {owner.birth_place && (
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>출생: {owner.birth_place}</span>
+                  </div>
+                )}
+                {owner.resting_place && (
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>영면: {owner.resting_place}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-            <div className="flex gap-4 flex-shrink-0">
+        {/* Motto and Bio Section */}
+        <div className="space-y-4 mb-10 px-8">
+          {owner.motto && (
+            <div className="bg-[var(--umber)]/5 border-l-2 border-[var(--umber)] p-4 rounded-r-xl">
+              <p className="font-display text-lg text-[var(--charcoal)] italic">"{owner.motto}"</p>
+            </div>
+          )}
+          
+          {owner.bio && (
+            <p className="text-[var(--graphite)] leading-relaxed whitespace-pre-wrap pl-1">
+              {owner.bio}
+            </p>
+          )}
+        </div>
+        
+        <div className="px-8 pb-8 flex gap-4">
               <div className="text-center px-5 py-3 rounded-xl bg-[var(--linen)]">
                 <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">-</p>
                 <p className="text-[10px] uppercase tracking-widest text-[var(--taupe)] mt-0.5">기록물</p>
@@ -186,8 +239,7 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
                 <p className="text-[10px] uppercase tracking-widest text-[var(--taupe)] mt-0.5">전시회</p>
               </div>
             </div>
-          </div>
-        </div>
+            </div>
       </section>
 
       {/* ═══════ 연혁 타임라인 ═══════ */}
@@ -236,6 +288,14 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
         <TimelineModal 
           onClose={() => setIsTimelineModalOpen(false)} 
           onSuccess={onTimelineUpdate} 
+        />
+      )}
+      {/* Profile Edit Modal */}
+      {isProfileModalOpen && (
+        <ProfileEditModal
+          owner={owner}
+          onClose={() => setIsProfileModalOpen(false)}
+          onSuccess={onTimelineUpdate}
         />
       )}
     </div>

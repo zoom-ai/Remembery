@@ -13,7 +13,8 @@ export default function Onboarding({ onComplete }: Props) {
 
   const [formData, setFormData] = useState({
     display_name: '',
-    subtitle: '',
+    birth_date: '',
+    death_date: '',
     title: '',
     bio: '',
     timelineYear: '',
@@ -36,7 +37,8 @@ export default function Onboarding({ onComplete }: Props) {
     try {
       const payload: OnboardingRequest = {
         display_name: formData.display_name.trim(),
-        subtitle: formData.subtitle.trim() || undefined,
+        birth_date: formData.birth_date.trim() || undefined,
+        death_date: formData.death_date.trim() || undefined,
         title: formData.title.trim() || undefined,
         bio: formData.bio.trim() || undefined,
         timeline_json: formData.timelineYear && formData.timelineEvent 
@@ -98,10 +100,17 @@ export default function Onboarding({ onComplete }: Props) {
                   <input type="text" name="display_name" value={formData.display_name} onChange={handleChange}
                     placeholder="예: 김영호" required autoFocus className={fieldClass} />
                 </div>
-                <div>
-                  <label className={labelClass}>생애 (또는 생년월일)</label>
-                  <input type="text" name="subtitle" value={formData.subtitle} onChange={handleChange}
-                    placeholder="예: 1942 - 2024" className={fieldClass} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass}>출생일</label>
+                    <input type="text" name="birth_date" value={formData.birth_date} onChange={handleChange}
+                      placeholder="예: 1942.04.15" className={fieldClass} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>사망일 (선택)</label>
+                    <input type="text" name="death_date" value={formData.death_date} onChange={handleChange}
+                      placeholder="예: 2024.11.20" className={fieldClass} />
+                  </div>
                 </div>
               </div>
             )}

@@ -94,10 +94,15 @@ class User(Base):
     display_name: Mapped[str]       = mapped_column(String(100), nullable=False)
     hashed_password: Mapped[str]    = mapped_column(String(255), nullable=False)
     role: Mapped[str]               = mapped_column(String(20), default=UserRole.VISITOR.value)
-    subtitle: Mapped[Optional[str]] = mapped_column(String(100), nullable=True) # e.g. "1942 - 2024"
-    title: Mapped[Optional[str]]    = mapped_column(String(255), nullable=True) # e.g. "교육자, 시인, 그리고 아버지"
+    subtitle: Mapped[Optional[str]] = mapped_column(String(100), nullable=True) # Deprecated, use birth_date/death_date
+    title: Mapped[Optional[str]]    = mapped_column(String(255), nullable=True)
     bio: Mapped[Optional[str]]      = mapped_column(Text, nullable=True)
-    timeline_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True) # JSON list of timeline events
+    birth_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    death_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    birth_place: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    resting_place: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    motto: Mapped[Optional[str]]    = mapped_column(String(500), nullable=True)
+    timeline_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool]         = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime]    = mapped_column(DateTime, default=datetime.utcnow)
