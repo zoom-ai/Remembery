@@ -7,7 +7,7 @@ GET  /api/archive/{id}    → Retrieve a single archive item by ID
 """
 
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form, BackgroundTasks
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import os
@@ -21,6 +21,73 @@ router = APIRouter(
     prefix="/archive",
     tags=["archive"],
 )
+
+
+def process_archive_ai_background(
+    item_id: int,
+    file_path: Optional[str],
+    category_name: str,
+    title: str,
+    description: Optional[str]
+):
+    """Asynchronous background worker to analyze files and generate rich preview metrics."""
+    from app.services import ai_service
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        # 1. Retrieve the archive item
+        db_item = db.query(models.ArchiveItem).filter(models.ArchiveItem.id == item_id).first()
+        if not db_item:
+            print(f"[AI Background] Archive item {item_id} not found.")
+            return
+
+        # 2. Determine file category
+        cat_lower = category_name.lower() if category_name else ""
+        file_ext = os.path.splitext(file_path)[1].lower() if file_path else ""
+
+        is_image = any(k in cat_lower for k in ["사진", "이미지", "photo", "image"]) or file_ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]
+        is_video = any(k in cat_lower for k in ["동영상", "비디오", "영상", "video", "movie"]) or file_ext in [".mp4", ".mov", ".avi", ".mkv"]
+        is_doc = any(k in cat_lower for k in ["문서", "책", "도서", "일기", "편지", "doc", "book", "pdf", "txt"]) or file_ext in [".pdf", ".txt", ".docx"]
+
+        print(f"[AI Background] Processing item {item_id} (Type: Image={is_image}, Video={is_video}, Doc={is_doc})")
+
+        # 3. Invoke appropriate AI service
+        ai_data = {"ai_summary": None, "highlight_quote": None}
+        if is_image:
+            ai_data = ai_service.analyze_image(file_path, title, description)
+        elif is_video:
+            ai_data = ai_service.analyze_video(file_path, title, description)
+        else:  # Default to document
+            ai_data = ai_service.analyze_document(file_path, title, description)
+
+        # 4. Update the DB record
+        db_item.ai_summary = ai_data.get("ai_summary")
+        db_item.highlight_quote = ai_data.get("highlight_quote")
+        
+        if is_image:
+            db_item.preview_url = db_item.file_url
+        else:
+            db_item.preview_url = None
+
+        db.commit()
+        print(f"[AI Background] Completed processing for item {item_id}. Saved to DB.")
+
+        # 5. Also update AIMemoryIndex stub if it exists
+        ai_index = db.query(models.AIMemoryIndex).filter(models.AIMemoryIndex.archive_item_id == item_id).first()
+        if ai_index:
+            context_prefix = f"[카테고리: {category_name}] " if category_name else ""
+            summary_body = db_item.ai_summary or f"Auto-summary for: {db_item.title}"
+            ai_index.summary = f"{context_prefix}{summary_body}"
+            ai_index.is_indexed = True
+            db.commit()
+            print(f"[AI Background] Updated AIMemoryIndex for item {item_id}.")
+
+    except Exception as e:
+        print(f"[AI Background ERROR] Failed processing item {item_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def _item_to_response(item: models.ArchiveItem) -> schemas.ArchiveItemResponse:
@@ -43,6 +110,7 @@ def _item_to_response(item: models.ArchiveItem) -> schemas.ArchiveItemResponse:
                 "automatically for later embedding generation.",
 )
 def upload_archive_item(
+    background_tasks: BackgroundTasks,
     owner_id: int = Form(...),
     title: str = Form(...),
     description: Optional[str] = Form(None),
@@ -76,6 +144,7 @@ def upload_archive_item(
 
     # Save the file locally if provided
     file_url = None
+    file_path = None
     if file:
         file_ext = os.path.splitext(file.filename)[1] if file.filename else ""
         unique_filename = f"{uuid.uuid4().hex}{file_ext}"
@@ -137,13 +206,23 @@ def upload_archive_item(
         crud.create_ai_index(db, ai_index_schema)
         ai_index_status = "pending"
 
-    # 4. Re-query to include relationships in the response
+    # 4. Trigger asynchronous AI generation in the background
+    background_tasks.add_task(
+        process_archive_ai_background,
+        item_id=db_item.id,
+        file_path=file_path,
+        category_name=category_label,
+        title=title,
+        description=description,
+    )
+
+    # 5. Re-query to include relationships in the response
     db_item = crud.get_archive_item(db, db_item.id)
 
     return schemas.ArchiveUploadResponse(
         item=_item_to_response(db_item),
         ai_index_status=ai_index_status,
-        message=f"Archive item '{db_item.title}' uploaded successfully.",
+        message=f"Archive item '{db_item.title}' uploaded successfully. AI rich preview generation has been queued.",
     )
 
 
