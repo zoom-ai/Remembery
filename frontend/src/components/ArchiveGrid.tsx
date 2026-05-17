@@ -5,9 +5,9 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Search, Loader2, Archive, Tag, Calendar,
+  Search, Loader2, Archive, Tag,
   FileText, BookOpen, Image, Video, Music, PenLine,
-  Plus, Upload, Eye, FolderPlus, Trash2,
+  Plus, Upload, FolderPlus, Trash2,
 } from 'lucide-react'
 import { archiveAPI, categoryAPI, type ArchiveItem, type Category } from '../services/api'
 import NewCategoryModal from './NewCategoryModal'

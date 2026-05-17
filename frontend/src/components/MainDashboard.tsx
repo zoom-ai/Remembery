@@ -239,9 +239,7 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
                 <p className="text-[10px] uppercase tracking-widest text-[var(--taupe)] mt-0.5">전시회</p>
               </div>
             </div>
-            </div>
       </section>
-
       {/* ═══════ 연혁 타임라인 ═══════ */}
       <section>
         <div className="flex items-center justify-between mb-6">

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Loader2, Upload, Camera } from 'lucide-react'
+import { X, Loader2, Camera } from 'lucide-react'
 import { userAPI, type User, type UserProfileUpdate } from '../services/api'
 
 interface Props {

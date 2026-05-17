@@ -121,7 +121,12 @@ def _mock_generate_curator_note(item: models.ArchiveItem, theme: str, language: 
     return random.choice(notes)
 
 
-def _mock_generate_exhibition_meta(theme: str, items_count: int, language: str = "ko") -> dict:
+def _mock_generate_exhibition_meta(
+    theme: str,
+    items_count: int,
+    language: str = "ko",
+    custom_color: Optional[str] = None,
+) -> dict:
     """
     Mock: Generate exhibition title, subtitle, and description.
 
@@ -130,7 +135,7 @@ def _mock_generate_exhibition_meta(theme: str, items_count: int, language: str =
         response = llm.invoke(prompt)
         return parse_response(response.content)
     """
-    color = random.choice(_THEME_COLORS)
+    color = custom_color or random.choice(_THEME_COLORS)
 
     if language == "ko":
         return {
@@ -225,13 +230,17 @@ def curate_exhibition(
         theme=payload.theme,
         items_count=len(curated_items),
         language=payload.language,
+        custom_color=payload.theme_color,
     )
+
+    layout = payload.layout_style or "timeline"
 
     return schemas.CurationResponse(
         exhibition_title=meta["title"],
         exhibition_subtitle=meta["subtitle"],
         exhibition_description=meta["description"],
         theme_color=meta["color"],
+        layout_style=layout,
         curated_items=curated_items,
         total_items_reviewed=total_items_in_archive,
         model="mock-remembery-curator-v1",

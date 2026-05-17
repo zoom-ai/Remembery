@@ -266,6 +266,8 @@ class CurationRequest(BaseModel):
     description: Optional[str] = Field(None, description="Additional context or instructions for the AI curator")
     max_items: int = Field(10, ge=1, le=50, description="Maximum number of items to include")
     language: str = Field("ko", description="Preferred output language: 'ko' or 'en'")
+    theme_color: Optional[str] = Field(None, description="Optional custom hex color theme override")
+    layout_style: Optional[str] = Field(None, description="Optional layout style preset: 'timeline', 'grid', 'slideshow', 'bento'")
 
 class CuratedItemSummary(BaseModel):
     """Summary of an archive item selected for the exhibition."""
@@ -282,6 +284,7 @@ class CurationResponse(BaseModel):
     exhibition_subtitle: str
     exhibition_description: str
     theme_color: str = Field(..., description="Suggested hex color for the exhibition, e.g. '#6366f1'")
+    layout_style: str = Field("timeline", description="Chosen layout style for rendering this exhibition")
     curated_items: List[CuratedItemSummary]
     total_items_reviewed: int
     model: str = Field(..., description="AI model used for curation")

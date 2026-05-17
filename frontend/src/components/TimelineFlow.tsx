@@ -1,11 +1,7 @@
-/**
- * Remembery — Timeline Flow Component
- * Chronological biography stream of digital memories with beautiful scroll reveals.
- */
 import { useState, useEffect, useRef } from 'react'
 import {
-  Calendar, FileText, BookOpen, Image as ImageIcon, Video, Music, PenLine,
-  Archive, Loader2, Clock, MapPin, Heart, Sparkles, AlertCircle, Tag
+  FileText, BookOpen, Image as ImageIcon, Video, Music, PenLine,
+  Archive, Loader2, Sparkles, AlertCircle, Tag
 } from 'lucide-react'
 import { archiveAPI, categoryAPI, type ArchiveItem, type Category, type User } from '../services/api'
 

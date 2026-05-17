@@ -130,6 +130,7 @@ export interface CurationResponse {
   exhibition_subtitle: string
   exhibition_description: string
   theme_color: string
+  layout_style: string
   curated_items: CuratedItemSummary[]
   total_items_reviewed: number
   model: string
@@ -249,6 +250,8 @@ export const exhibitionAPI = {
     description?: string
     max_items?: number
     language?: string
+    theme_color?: string
+    layout_style?: string
   }) => API.post<CurationResponse>('/exhibition/curate', data),
 }
 
