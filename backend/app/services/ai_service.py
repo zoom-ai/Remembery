@@ -5,7 +5,20 @@ import base64
 import re
 from typing import Optional, Dict, Any
 
-# Resolve Gemini API Key from environment
+# Resolve Gemini API Key from environment or manual .env file
+# Try to load .env manually from the backend root
+_env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
+if os.path.exists(_env_path):
+    try:
+        with open(_env_path, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ[_k.strip()] = _v.strip()
+    except Exception as _e:
+        print(f"[AI Service] Warning: Failed to parse manual .env: {_e}")
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 def _call_gemini_api(contents: list, model: str = "gemini-2.5-flash") -> Optional[str]:
