@@ -3,19 +3,21 @@
  * Tab-based navigation between Dashboard, Archive, and Exhibition.
  */
 import { useState, useEffect } from 'react'
-import { Home, Archive, Landmark, Heart, Loader2 } from 'lucide-react'
+import { Home, Archive, Landmark, Heart, Loader2, History } from 'lucide-react'
 import { userAPI, type User } from './services/api'
 
 import MainDashboard from './components/MainDashboard'
 import ArchiveGrid from './components/ArchiveGrid'
 import ExhibitionHall from './components/ExhibitionHall'
 import Onboarding from './components/Onboarding'
+import TimelineFlow from './components/TimelineFlow'
 
-type Tab = 'dashboard' | 'archive' | 'exhibition'
+type Tab = 'dashboard' | 'archive' | 'exhibition' | 'timeline'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard',  label: '대시보드',   icon: Home },
   { key: 'archive',    label: '보관함',     icon: Archive },
+  { key: 'timeline',   label: '타임라인',   icon: History },
   { key: 'exhibition', label: '전시관',     icon: Landmark },
 ]
 
@@ -99,8 +101,9 @@ function App() {
 
       {/* ═══════ Main Content ═══════ */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-10">
-        {activeTab === 'dashboard' && <MainDashboard owner={owner} />}
+        {activeTab === 'dashboard' && <MainDashboard owner={owner} onTimelineUpdate={fetchOwner} />}
         {activeTab === 'archive' && <ArchiveGrid />}
+        {activeTab === 'timeline' && <TimelineFlow owner={owner} />}
         {activeTab === 'exhibition' && <ExhibitionHall />}
       </main>
 
