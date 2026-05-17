@@ -12,12 +12,25 @@ const API = axios.create({
 
 /* ────────────── Types ────────────── */
 
+export interface Category {
+  id: number
+  user_id: number | null
+  name: string
+  description: string | null
+  icon: string | null
+  color: string | null
+  is_default: boolean
+  created_at: string
+}
+
 export interface ArchiveItem {
   id: number
   owner_id: number
+  category_id: number | null
+  category_name: string | null
   title: string
   description: string | null
-  item_type: string
+  item_type: string | null
   file_url: string | null
   thumbnail_url: string | null
   tags: string
@@ -72,12 +85,39 @@ export interface CurationResponse {
   message: string
 }
 
+/* ────────────── Category API ────────────── */
+
+export const categoryAPI = {
+  list: (user_id?: number) =>
+    API.get<Category[]>('/categories/', { params: user_id ? { user_id } : {} }),
+
+  create: (data: {
+    name: string
+    description?: string
+    icon?: string
+    color?: string
+    user_id?: number
+  }) => API.post<Category>('/categories/', data),
+
+  update: (id: number, data: {
+    name?: string
+    description?: string
+    icon?: string
+    color?: string
+  }) => API.patch<Category>(`/categories/${id}`, data),
+
+  delete: (id: number) => API.delete(`/categories/${id}`),
+
+  seed: () => API.post<Category[]>('/categories/seed'),
+}
+
 /* ────────────── Archive API ────────────── */
 
 export const archiveAPI = {
   list: (params?: {
     q?: string
     item_type?: string
+    category_id?: number
     owner_id?: number
     skip?: number
     limit?: number
@@ -87,6 +127,7 @@ export const archiveAPI = {
     owner_id: number
     title: string
     description?: string
+    category_id?: number
     item_type?: string
     tags?: string
     file_url?: string
