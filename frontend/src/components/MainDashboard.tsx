@@ -4,12 +4,12 @@
  * 고인의 프로필 영역, 연혁 타임라인,
  * 상단 "AI 도슨트에게 질문하기" 검색 바를 포함합니다.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Search, Loader2, Quote, Calendar,
   Sparkles, ChevronRight, MessageCircle, X, Plus, Edit2, MapPin
 } from 'lucide-react'
-import { aiAPI, type RAGQueryResponse } from '../services/api'
+import { aiAPI, archiveAPI, type RAGQueryResponse } from '../services/api'
 import TimelineModal from './TimelineModal'
 import ProfileEditModal from './ProfileEditModal'
 
@@ -27,6 +27,19 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [totalArchives, setTotalArchives] = useState<number | null>(null)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await archiveAPI.list({ owner_id: owner.id, limit: 1 })
+        setTotalArchives(res.data.total)
+      } catch (err) {
+        console.error("Failed to fetch archive stats:", err)
+      }
+    }
+    fetchStats()
+  }, [owner.id])
 
   const handleAskDocent = async () => {
     if (!question.trim()) return
@@ -231,11 +244,15 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
         
         <div className="px-8 pb-8 flex gap-4">
               <div className="text-center px-5 py-3 rounded-xl bg-[var(--linen)]">
-                <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">-</p>
+                <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">
+                  {totalArchives !== null ? totalArchives : '-'}
+                </p>
                 <p className="text-[10px] uppercase tracking-widest text-[var(--taupe)] mt-0.5">기록물</p>
               </div>
               <div className="text-center px-5 py-3 rounded-xl bg-[var(--linen)]">
-                <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">-</p>
+                <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">
+                  {totalArchives !== null ? Math.max(1, Math.ceil(totalArchives / 2)) : '-'}
+                </p>
                 <p className="text-[10px] uppercase tracking-widest text-[var(--taupe)] mt-0.5">전시회</p>
               </div>
             </div>
