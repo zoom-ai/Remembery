@@ -213,7 +213,7 @@ def curate_exhibition(
             schemas.CuratedItemSummary(
                 archive_item_id=item.id,
                 title=item.title,
-                item_type=item.item_type,
+                item_type=item.item_type or (item.category.name if getattr(item, "category", None) else "기록"),
                 ai_curator_note=note,
                 display_order=order,
                 relevance_score=score,
