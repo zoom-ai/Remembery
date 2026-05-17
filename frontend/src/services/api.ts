@@ -130,10 +130,25 @@ export const archiveAPI = {
     category_id?: number
     item_type?: string
     tags?: string
-    file_url?: string
     source?: string
     auto_index?: boolean
-  }) => API.post('/archive/upload', data),
+    file?: File
+  }) => {
+    const formData = new FormData()
+    formData.append('owner_id', String(data.owner_id))
+    formData.append('title', data.title)
+    if (data.description) formData.append('description', data.description)
+    if (data.category_id) formData.append('category_id', String(data.category_id))
+    if (data.item_type) formData.append('item_type', data.item_type)
+    if (data.tags) formData.append('tags', data.tags)
+    if (data.source) formData.append('source', data.source)
+    if (data.auto_index) formData.append('auto_index', String(data.auto_index))
+    if (data.file) formData.append('file', data.file)
+
+    return API.post('/archive/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
 
   getOne: (id: number) => API.get<ArchiveItem>(`/archive/${id}`),
 }

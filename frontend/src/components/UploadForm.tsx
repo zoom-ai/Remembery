@@ -18,6 +18,7 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
   const [tags, setTags] = useState('')
   const [source, setSource] = useState('')
   const [originalDate, setOriginalDate] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [catOpen, setCatOpen] = useState(false)
@@ -38,6 +39,7 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
         tags: tags.trim() || undefined,
         source: source.trim() || undefined,
         auto_index: true,
+        file: file || undefined,
       })
       onUploaded()
       onClose()
@@ -79,6 +81,19 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
             <label className={labelClass}>제목 <span className="text-rose-400">*</span></label>
             <input type="text" value={title} onChange={e => setTitle(e.target.value)}
               placeholder="자료의 제목을 입력하세요" required className={fieldClass} />
+          </div>
+
+          {/* File Upload */}
+          <div>
+            <label className={labelClass}>파일 첨부</label>
+            <input type="file" onChange={e => setFile(e.target.files?.[0] || null)}
+              className="w-full text-sm text-[var(--taupe)]
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-xl file:border-0
+              file:text-sm file:font-semibold
+              file:bg-[var(--linen)] file:text-[var(--charcoal)]
+              hover:file:bg-[var(--taupe)] hover:file:text-[var(--ivory)]
+              transition-all cursor-pointer" />
           </div>
 
           {/* Category Dropdown */}

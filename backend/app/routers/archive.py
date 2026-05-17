@@ -7,9 +7,12 @@ GET  /api/archive/{id}    → Retrieve a single archive item by ID
 """
 
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Form
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
+import os
+import uuid
+import re
 
 from app import models, crud, schemas
 from app.database import get_db
@@ -35,50 +38,78 @@ def _item_to_response(item: models.ArchiveItem) -> schemas.ArchiveItemResponse:
     response_model=schemas.ArchiveUploadResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Upload a new archive item",
-    description="Creates an ArchiveItem record with metadata. "
+    description="Creates an ArchiveItem record with metadata and saves the uploaded file locally. "
                 "If `auto_index` is true, an AIMemoryIndex stub is created "
                 "automatically for later embedding generation.",
 )
 def upload_archive_item(
-    payload: schemas.ArchiveUploadRequest,
+    owner_id: int = Form(...),
+    title: str = Form(...),
+    description: Optional[str] = Form(None),
+    category_id: Optional[int] = Form(None),
+    item_type: Optional[str] = Form(None),
+    tags: Optional[str] = Form(""),
+    metadata_json: Optional[str] = Form(None),
+    source: Optional[str] = Form(None),
+    auto_index: bool = Form(False),
+    file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
     # 1. Validate that the owner exists
-    owner = crud.get_user(db, payload.owner_id)
+    owner = crud.get_user(db, owner_id)
     if not owner:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id={payload.owner_id} not found. "
+            detail=f"User with id={owner_id} not found. "
                    "Please register the owner first.",
         )
 
+    # Resolve category name for directory creation and context enrichment
+    category_label = ""
+    cat_dir_name = "uncategorized"
+    if category_id:
+        cat = crud.get_category(db, category_id)
+        if cat:
+            category_label = cat.name
+            # Create a safe directory name
+            cat_dir_name = re.sub(r'[^a-zA-Z0-9_\-\uac00-\ud7a3]', '_', cat.name)
+
+    # Save the file locally if provided
+    file_url = None
+    if file:
+        file_ext = os.path.splitext(file.filename)[1] if file.filename else ""
+        unique_filename = f"{uuid.uuid4().hex}{file_ext}"
+        
+        # Determine the directory path
+        upload_dir = os.path.join("uploads", cat_dir_name)
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        file_path = os.path.join(upload_dir, unique_filename)
+        with open(file_path, "wb") as f:
+            f.write(file.file.read())
+            
+        file_url = f"/uploads/{cat_dir_name}/{unique_filename}"
+
     # 2. Create the ArchiveItem record
     item_schema = schemas.ArchiveItemCreate(
-        owner_id=payload.owner_id,
-        category_id=payload.category_id,
-        title=payload.title,
-        description=payload.description,
-        item_type=payload.item_type,
-        file_url=payload.file_url,
-        thumbnail_url=payload.thumbnail_url,
-        tags=payload.tags,
-        metadata_json=payload.metadata_json,
-        original_date=payload.original_date,
-        source=payload.source,
-        is_public=payload.is_public,
+        owner_id=owner_id,
+        category_id=category_id,
+        title=title,
+        description=description,
+        item_type=item_type,
+        file_url=file_url,
+        thumbnail_url=None,
+        tags=tags,
+        metadata_json=metadata_json,
+        original_date=None,
+        source=source,
+        is_public=False,
     )
     db_item = crud.create_archive_item(db, item_schema)
 
     # 3. Optionally create an AIMemoryIndex stub for future embedding
     ai_index_status = "skipped"
-    if payload.auto_index:
-        # Resolve category name for context enrichment
-        category_label = ""
-        if db_item.category_id:
-            cat = crud.get_category(db, db_item.category_id)
-            if cat:
-                category_label = cat.name
-
+    if auto_index:
         # Build context-enriched summary that tells the RAG engine
         # which category this item belongs to
         context_prefix = (
@@ -90,7 +121,7 @@ def upload_archive_item(
         )
 
         # Prepend category as a topic for semantic retrieval
-        base_topics = payload.tags or ""
+        base_topics = tags or ""
         enriched_topics = (
             f"{category_label}, {base_topics}" if category_label else base_topics
         )

@@ -1,8 +1,13 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app import models
 from app.database import engine
 from app.routers import memories, archive, ai, exhibition, category
+
+# Create uploads directory if it doesn't exist
+os.makedirs("uploads", exist_ok=True)
 
 # Automatically create database tables on startup
 models.Base.metadata.create_all(bind=engine)
@@ -19,6 +24,9 @@ app = FastAPI(
     ),
     version="2.0.0"
 )
+
+# Mount StaticFiles for uploaded materials
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # CORS Configuration for local frontend environments
 origins = [
