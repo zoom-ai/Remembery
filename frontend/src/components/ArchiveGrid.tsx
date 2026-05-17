@@ -309,6 +309,7 @@ function SidebarItem({ label, icon: Icon, isActive, color, count, onClick, onDel
 }
 
 /* ─── ArchiveCard ──────────────────────────────────────── */
+/* ─── ArchiveCard ──────────────────────────────────────── */
 function ArchiveCard({ item, categories, isExpanded, onToggle }: {
   item: ArchiveItem
   categories: Category[]
@@ -319,63 +320,230 @@ function ArchiveCard({ item, categories, isExpanded, onToggle }: {
   const catColor = cat?.color || '#8c8278'
   const CatIcon = getCategoryIcon(cat?.icon || null)
 
-  return (
-    <article
-      onClick={onToggle}
-      className="museum-card rounded-2xl overflow-hidden cursor-pointer flex flex-col group"
-    >
-      {/* Top color accent */}
-      <div className="h-1 flex-shrink-0" style={{ backgroundColor: catColor, opacity: 0.6 }} />
+  const isImage = item.file_url && /\.(jpg|jpeg|png|webp|gif)$/i.test(item.file_url)
+  const imageUrl = isImage ? `http://localhost:8000${item.file_url}` : null
 
-      <div className="p-5 flex-1 flex flex-col">
-        {/* Category badge + date */}
-        <div className="flex items-center justify-between mb-3">
-          <span
-            className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full"
-            style={{ backgroundColor: catColor + '18', color: catColor }}
+  // 1. Normal State (Grid Item, not expanded)
+  if (!isExpanded) {
+    return (
+      <article
+        onClick={onToggle}
+        className="relative overflow-hidden aspect-[4/3] w-full rounded-2xl border border-[var(--linen)] bg-black/20 group cursor-pointer transition-all duration-500 hover:scale-[1.03] hover:shadow-xl hover:shadow-[var(--umber)]/10 flex flex-col"
+      >
+        {/* Cover image or fallback gradient */}
+        {imageUrl ? (
+          <div className="absolute inset-0 z-0">
+            <img
+              src={imageUrl}
+              alt={item.title}
+              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            />
+            {/* Dark premium gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-black/20 transition-all duration-500 group-hover:from-black/90 group-hover:via-black/30" />
+          </div>
+        ) : (
+          <div
+            className="absolute inset-0 z-0 bg-gradient-to-br flex items-center justify-center overflow-hidden transition-all duration-500"
+            style={{
+              backgroundImage: `linear-gradient(135deg, ${catColor}15 0%, #12100e 100%)`
+            }}
           >
-            <CatIcon className="w-3 h-3" />
-            {item.category_name || cat?.name || item.item_type || '기타'}
-          </span>
-          {item.original_date && (
-            <span className="text-[11px] text-[var(--taupe)] flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              {formatDate(item.original_date)}
-            </span>
-          )}
-        </div>
-
-        {/* Title */}
-        <h3 className="text-sm font-semibold text-[var(--charcoal)] group-hover:text-[var(--umber)] transition-colors leading-snug mb-2">
-          {item.title}
-        </h3>
-
-        {/* Description */}
-        <p className={`text-xs text-[var(--graphite)] leading-relaxed flex-1 ${isExpanded ? '' : 'line-clamp-3'}`}>
-          {item.description || '설명 없음'}
-        </p>
-
-        {/* Tags */}
-        {item.tags && (
-          <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-[var(--linen)]">
-            {item.tags.split(',').slice(0, 3).map((t, i) => (
-              <span key={i} className="inline-flex items-center text-[10px] text-[var(--taupe)] bg-[var(--linen)] px-2 py-0.5 rounded-md">
-                <Tag className="w-2.5 h-2.5 mr-1" />{t.trim()}
-              </span>
-            ))}
-            {item.tags.split(',').length > 3 && (
-              <span className="text-[10px] text-[var(--taupe)]">+{item.tags.split(',').length - 3}</span>
-            )}
+            <CatIcon className="w-20 h-20 opacity-[0.04] text-[var(--ivory)] transform rotate-12 transition-transform duration-700 group-hover:scale-110 group-hover:rotate-6" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
           </div>
         )}
-      </div>
 
-      {/* Footer */}
-      <div className="px-5 py-2.5 bg-[var(--linen)]/50 border-t border-[var(--linen)] flex items-center justify-between flex-shrink-0">
-        <span className="text-[10px] text-[var(--taupe)]">{formatDate(item.created_at)}</span>
-        <div className="flex items-center gap-1 text-[var(--taupe)]">
-          <Eye className="w-3 h-3" />
-          <span className="text-[10px]">{isExpanded ? '접기' : '상세 보기'}</span>
+        {/* Floating Accent Bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 z-10" style={{ backgroundColor: catColor, opacity: 0.7 }} />
+
+        {/* Front Content (Title & Badge) */}
+        <div className="absolute inset-0 p-5 z-10 flex flex-col justify-end pointer-events-none">
+          <div className="flex items-center justify-between mb-2">
+            <span
+              className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md backdrop-blur-md border"
+              style={{
+                backgroundColor: catColor + '18',
+                borderColor: catColor + '30',
+                color: catColor
+              }}
+            >
+              <CatIcon className="w-2.5 h-2.5" />
+              {item.category_name || cat?.name || item.item_type || '기타'}
+            </span>
+            {item.original_date && (
+              <span className="text-[10px] text-white/50 font-medium">
+                {formatDate(item.original_date)}
+              </span>
+            )}
+          </div>
+
+          <h3 className="font-display text-sm font-semibold text-white/95 leading-snug group-hover:text-[var(--umber)] transition-colors line-clamp-2">
+            {item.title}
+          </h3>
+        </div>
+
+        {/* 🌟 Elegant Hover Overlay (AI Insights & Quotes) 🌟 */}
+        <div className="absolute inset-0 z-20 bg-black/95 backdrop-blur-md p-5 flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-all duration-500 pointer-events-auto">
+          <div className="space-y-3.5">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--umber)] flex items-center gap-1">
+                ✦ AI Docent Insight
+              </span>
+              {item.original_date && (
+                <span className="text-[9px] text-white/40">{formatDate(item.original_date)}</span>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <h4 className="text-[9px] font-bold text-white/40 uppercase tracking-widest">분석 요약</h4>
+              <p className="text-[11px] text-[var(--linen)]/90 leading-relaxed font-medium line-clamp-3">
+                {item.ai_summary || item.description || '저장된 미디어를 분석하고 있습니다.'}
+              </p>
+            </div>
+
+            {item.highlight_quote && (
+              <div className="relative mt-2 p-3 bg-white/[0.02] border border-white/5 rounded-xl text-center italic text-[11px] font-serif text-[var(--ivory)] leading-relaxed">
+                <span className="absolute -top-1.5 left-2 text-lg text-[var(--umber)] font-serif leading-none">“</span>
+                <p className="px-3 py-1 font-display text-[var(--linen)]/90 text-center leading-normal">
+                  {item.highlight_quote}
+                </p>
+                <span className="absolute -bottom-3 right-2 text-lg text-[var(--umber)] font-serif leading-none">”</span>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+            <span className="text-[9px] text-white/30">{formatDate(item.created_at)}</span>
+            <span className="text-[9px] font-bold text-[var(--umber)] tracking-wider flex items-center gap-0.5">
+              자세히 보기 →
+            </span>
+          </div>
+        </div>
+      </article>
+    )
+  }
+
+  // 2. Expanded Detail Banner state (Clicked/Full view)
+  return (
+    <article
+      className="museum-card rounded-2xl overflow-hidden cursor-default flex flex-col border border-[var(--linen)] transition-all duration-500 shadow-lg col-span-1 sm:col-span-2 lg:col-span-3"
+    >
+      {/* Accent Header */}
+      <div className="h-1 flex-shrink-0" style={{ backgroundColor: catColor, opacity: 0.8 }} />
+
+      <div className="flex flex-col md:flex-row min-h-[300px]">
+        {/* Left Panel: Cover & Core Info */}
+        <div className="w-full md:w-2/5 relative min-h-[220px] md:min-h-0 bg-black/20">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={item.title}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div
+              className="absolute inset-0 bg-gradient-to-br flex items-center justify-center overflow-hidden"
+              style={{
+                backgroundImage: `linear-gradient(135deg, ${catColor}15 0%, #12100e 100%)`
+              }}
+            >
+              <CatIcon className="w-24 h-24 opacity-[0.03] text-[var(--ivory)] transform rotate-12" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/90 via-black/45 to-transparent" />
+          
+          <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col gap-2 z-10">
+            <span
+              className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md backdrop-blur-md border w-fit"
+              style={{
+                backgroundColor: catColor + '20',
+                borderColor: catColor + '40',
+                color: catColor
+              }}
+            >
+              <CatIcon className="w-3 h-3" />
+              {item.category_name || cat?.name || item.item_type || '기타'}
+            </span>
+            <h3 className="font-display text-lg font-bold text-white leading-snug">
+              {item.title}
+            </h3>
+          </div>
+        </div>
+
+        {/* Right Panel: Detailed view */}
+        <div className="flex-1 p-6 flex flex-col justify-between bg-[var(--museum-bg)]">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-[11px] text-[var(--taupe)] border-b border-[var(--linen)] pb-2">
+              <span>보관일: {formatDate(item.created_at)}</span>
+              {item.original_date && <span>생전 시기: {formatDate(item.original_date)}</span>}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <h4 className="text-[10px] font-bold text-[var(--taupe)] uppercase tracking-wider">설명 및 비하인드 스토리</h4>
+              <p className="text-xs text-[var(--charcoal)] leading-relaxed whitespace-pre-wrap">
+                {item.description || '기록에 대한 별도의 설명이 등록되어 있지 않습니다.'}
+              </p>
+            </div>
+
+            {/* AI Curated Insights Panel */}
+            {(item.ai_summary || item.highlight_quote) && (
+              <div className="p-4 rounded-xl bg-[var(--linen)]/50 border border-[var(--linen)] space-y-3">
+                <div className="text-[10px] font-bold text-[var(--umber)] tracking-widest uppercase flex items-center gap-1">
+                  ✦ AI 도슨트 감상평 (Insight)
+                </div>
+                
+                {item.ai_summary && (
+                  <p className="text-xs text-[var(--charcoal)] font-semibold leading-relaxed">
+                    {item.ai_summary}
+                  </p>
+                )}
+
+                {item.highlight_quote && (
+                  <div className="relative mt-2.5 p-3.5 bg-white/40 border border-[var(--linen)] rounded-xl italic text-xs font-serif text-[var(--graphite)] leading-relaxed text-center">
+                    "{item.highlight_quote}"
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tags */}
+            {item.tags && (
+              <div className="flex flex-wrap gap-1.5 pt-3 border-t border-[var(--linen)]">
+                {item.tags.split(',').map((t, i) => (
+                  <span key={i} className="inline-flex items-center text-[10px] text-[var(--taupe)] bg-[var(--linen)] px-2.5 py-1 rounded-md">
+                    <Tag className="w-2.5 h-2.5 mr-1" />{t.trim()}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action Footer */}
+          <div className="mt-6 pt-3 border-t border-[var(--linen)] flex items-center justify-between">
+            {item.file_url ? (
+              <a
+                href={`http://localhost:8000${item.file_url}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--umber)] font-semibold hover:underline"
+              >
+                원본 자료 내려받기 (Download Original) →
+              </a>
+            ) : (
+              <span className="text-xs text-[var(--taupe)]">미디어 파일 없음</span>
+            )}
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggle()
+              }}
+              className="text-xs font-semibold text-[var(--taupe)] hover:text-[var(--charcoal)] transition"
+            >
+              상세 보기 접기 ▲
+            </button>
+          </div>
         </div>
       </div>
     </article>

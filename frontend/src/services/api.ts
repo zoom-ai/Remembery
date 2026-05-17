@@ -86,6 +86,9 @@ export interface ArchiveItem {
   original_date: string | null
   source: string | null
   is_public: boolean
+  ai_summary: string | null
+  highlight_quote: string | null
+  preview_url: string | null
   created_at: string
   updated_at: string
 }
