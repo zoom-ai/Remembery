@@ -16,8 +16,18 @@ class UserBase(BaseModel):
     email: str = Field(..., min_length=5, max_length=255)
     display_name: str = Field(..., min_length=1, max_length=100)
     role: Optional[str] = "visitor"
+    subtitle: Optional[str] = None
+    title: Optional[str] = None
     bio: Optional[str] = None
+    timeline_json: Optional[list] = None
     avatar_url: Optional[str] = None
+
+class OnboardingRequest(BaseModel):
+    display_name: str
+    subtitle: Optional[str] = None
+    title: Optional[str] = None
+    bio: Optional[str] = None
+    timeline_json: Optional[list] = None
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=128)

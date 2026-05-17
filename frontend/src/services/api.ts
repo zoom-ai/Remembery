@@ -12,6 +12,28 @@ const API = axios.create({
 
 /* ────────────── Types ────────────── */
 
+export interface User {
+  id: number
+  email: string
+  display_name: string
+  role: string
+  subtitle: string | null
+  title: string | null
+  bio: string | null
+  timeline_json: any[] | null
+  avatar_url: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface OnboardingRequest {
+  display_name: string
+  subtitle?: string
+  title?: string
+  bio?: string
+  timeline_json?: any[]
+}
+
 export interface Category {
   id: number
   user_id: number | null
@@ -151,6 +173,17 @@ export const archiveAPI = {
   },
 
   getOne: (id: number) => API.get<ArchiveItem>(`/archive/${id}`),
+}
+
+export const userAPI = {
+  getOwner: async () => {
+    const res = await API.get<User>('/users/owner')
+    return res.data
+  },
+  onboard: async (data: OnboardingRequest) => {
+    const res = await API.post<User>('/users/onboard', data)
+    return res.data
+  }
 }
 
 /* ────────────── AI RAG API ────────────── */

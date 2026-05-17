@@ -22,14 +22,36 @@ def get_user(db: Session, user_id: int) -> Optional[models.User]:
 def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
     return db.query(models.User).filter(models.User.email == email).first()
 
+def get_owner(db: Session) -> Optional[models.User]:
+    return db.query(models.User).filter(models.User.role == "owner").first()
+
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     db_user = models.User(
         email=user.email,
         display_name=user.display_name,
         hashed_password=user.password,  # TODO: hash with bcrypt in production
         role=user.role,
+        subtitle=user.subtitle,
+        title=user.title,
         bio=user.bio,
+        timeline_json=user.timeline_json,
         avatar_url=user.avatar_url,
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def create_owner(db: Session, req: schemas.OnboardingRequest) -> models.User:
+    db_user = models.User(
+        email="owner@remembery.local",  # Mock email for onboarding
+        display_name=req.display_name,
+        hashed_password="not_used_locally",
+        role="owner",
+        subtitle=req.subtitle,
+        title=req.title,
+        bio=req.bio,
+        timeline_json=req.timeline_json,
     )
     db.add(db_user)
     db.commit()

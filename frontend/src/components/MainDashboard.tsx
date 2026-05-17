@@ -11,29 +11,13 @@ import {
 } from 'lucide-react'
 import { aiAPI, type RAGQueryResponse } from '../services/api'
 
-/* ─── Mock Profile & Timeline (데모용) ─── */
-const PROFILE = {
-  name: '김영호',
-  subtitle: '1942 – 2024',
-  title: '교육자, 시인, 그리고 사랑하는 아버지',
-  bio: '평생을 교단에서 학생들과 함께한 교육자. 틈틈이 시를 쓰고, 자연을 사랑하며 가족에게 따뜻한 편지를 남기셨습니다.',
-  avatarInitials: '영호',
-  archiveCount: 128,
-  exhibitionCount: 3,
+import { type User } from '../services/api'
+
+interface Props {
+  owner: User
 }
 
-const TIMELINE = [
-  { year: '1942', event: '경상북도 안동에서 출생', icon: '🌱' },
-  { year: '1964', event: '서울대학교 국문학과 졸업', icon: '🎓' },
-  { year: '1965', event: '첫 시집 『봄을 기다리며』 출간', icon: '📖' },
-  { year: '1970', event: '경북 고등학교 국어 교사 부임', icon: '🏫' },
-  { year: '1985', event: '교육자 표창 수상', icon: '🏆' },
-  { year: '1995', event: '제주도 가족 여행 — 가장 행복했던 여름', icon: '✈️' },
-  { year: '2010', event: '은퇴 후 회고록 집필 시작', icon: '✍️' },
-  { year: '2024', event: '가족의 품에서 영면', icon: '🕊️' },
-]
-
-export default function MainDashboard() {
+export default function MainDashboard({ owner }: Props) {
   const [question, setQuestion] = useState('')
   const [isQuerying, setIsQuerying] = useState(false)
   const [ragResult, setRagResult] = useState<RAGQueryResponse | null>(null)
@@ -174,26 +158,28 @@ export default function MainDashboard() {
         <div className="h-24 bg-gradient-to-r from-[var(--museum)] via-[var(--umber)] to-[var(--museum)]" />
         <div className="px-8 pb-8 -mt-10 relative">
           <div className="w-20 h-20 rounded-2xl bg-[var(--linen)] border-4 border-[var(--ivory)] flex items-center justify-center shadow-lg">
-            <span className="font-display text-2xl font-semibold text-[var(--museum)]">{PROFILE.avatarInitials}</span>
+            <span className="font-display text-2xl font-semibold text-[var(--museum)]">
+              {owner.display_name.slice(-2)}
+            </span>
           </div>
 
           <div className="mt-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
               <h1 className="font-display text-3xl sm:text-4xl font-semibold text-[var(--charcoal)] tracking-tight">
-                {PROFILE.name}
+                {owner.display_name}
               </h1>
-              <p className="text-sm text-[var(--taupe)] mt-0.5">{PROFILE.subtitle}</p>
-              <p className="font-display text-lg italic text-[var(--umber)] mt-1">{PROFILE.title}</p>
-              <p className="text-sm text-[var(--graphite)] mt-3 max-w-xl leading-relaxed">{PROFILE.bio}</p>
+              {owner.subtitle && <p className="text-sm text-[var(--taupe)] mt-0.5">{owner.subtitle}</p>}
+              {owner.title && <p className="font-display text-lg italic text-[var(--umber)] mt-1">{owner.title}</p>}
+              {owner.bio && <p className="text-sm text-[var(--graphite)] mt-3 max-w-xl leading-relaxed">{owner.bio}</p>}
             </div>
 
             <div className="flex gap-4 flex-shrink-0">
               <div className="text-center px-5 py-3 rounded-xl bg-[var(--linen)]">
-                <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">{PROFILE.archiveCount}</p>
+                <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">-</p>
                 <p className="text-[10px] uppercase tracking-widest text-[var(--taupe)] mt-0.5">기록물</p>
               </div>
               <div className="text-center px-5 py-3 rounded-xl bg-[var(--linen)]">
-                <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">{PROFILE.exhibitionCount}</p>
+                <p className="font-display text-2xl font-semibold text-[var(--charcoal)]">-</p>
                 <p className="text-[10px] uppercase tracking-widest text-[var(--taupe)] mt-0.5">전시회</p>
               </div>
             </div>
@@ -212,23 +198,25 @@ export default function MainDashboard() {
           {/* Vertical line */}
           <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-[var(--umber)] via-[var(--taupe)] to-transparent" />
 
-          {TIMELINE.map((item, idx) => (
-            <div key={idx} className="relative pb-8 last:pb-0 group">
-              {/* Dot */}
-              <div className="absolute -left-8 top-1 w-[22px] h-[22px] rounded-full border-2 border-[var(--umber)] bg-[var(--ivory)] flex items-center justify-center group-hover:bg-[var(--umber)] transition-colors duration-300">
-                <div className="w-2 h-2 rounded-full bg-[var(--umber)] group-hover:bg-[var(--ivory)] transition-colors duration-300" />
-              </div>
-
-              <div className="museum-card rounded-xl px-5 py-4 flex items-center gap-4 group-hover:border-[var(--umber)]/30">
-                <span className="text-xl flex-shrink-0">{item.icon}</span>
-                <div>
-                  <span className="text-xs font-semibold tracking-wider text-[var(--umber)] uppercase">{item.year}</span>
-                  <p className="text-sm text-[var(--charcoal)] mt-0.5 font-medium">{item.event}</p>
+          {owner.timeline_json && owner.timeline_json.length > 0 ? (
+            owner.timeline_json.map((item, idx) => (
+              <div key={idx} className="relative pb-8 last:pb-0 group">
+                <div className="absolute -left-8 top-1 w-[22px] h-[22px] rounded-full border-2 border-[var(--umber)] bg-[var(--ivory)] flex items-center justify-center group-hover:bg-[var(--umber)] transition-colors duration-300">
+                  <div className="w-2 h-2 rounded-full bg-[var(--umber)] group-hover:bg-[var(--ivory)] transition-colors duration-300" />
                 </div>
-                <ChevronRight className="w-4 h-4 text-[var(--taupe)] ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="museum-card rounded-xl px-5 py-4 flex items-center gap-4 group-hover:border-[var(--umber)]/30">
+                  <span className="text-xl flex-shrink-0">{item.icon || '🌱'}</span>
+                  <div>
+                    <span className="text-xs font-semibold tracking-wider text-[var(--umber)] uppercase">{item.year}</span>
+                    <p className="text-sm text-[var(--charcoal)] mt-0.5 font-medium">{item.event}</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[var(--taupe)] ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="text-sm text-[var(--taupe)] pl-2">등록된 연혁이 없습니다.</div>
+          )}
         </div>
       </section>
     </div>

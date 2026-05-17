@@ -2,12 +2,14 @@
  * Remembery — App Shell
  * Tab-based navigation between Dashboard, Archive, and Exhibition.
  */
-import { useState } from 'react'
-import { Home, Archive, Landmark, Heart } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Home, Archive, Landmark, Heart, Loader2 } from 'lucide-react'
+import { userAPI, type User } from './services/api'
 
 import MainDashboard from './components/MainDashboard'
 import ArchiveGrid from './components/ArchiveGrid'
 import ExhibitionHall from './components/ExhibitionHall'
+import Onboarding from './components/Onboarding'
 
 type Tab = 'dashboard' | 'archive' | 'exhibition'
 
@@ -19,6 +21,35 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+  const [owner, setOwner] = useState<User | null>(null)
+  const [isInitializing, setIsInitializing] = useState(true)
+
+  const fetchOwner = async () => {
+    try {
+      const data = await userAPI.getOwner()
+      setOwner(data)
+    } catch {
+      setOwner(null)
+    } finally {
+      setIsInitializing(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchOwner()
+  }, [])
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--parchment)]">
+        <Loader2 className="w-8 h-8 text-[var(--museum)] animate-spin" />
+      </div>
+    )
+  }
+
+  if (!owner) {
+    return <Onboarding onComplete={fetchOwner} />
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--parchment)]">
@@ -68,7 +99,7 @@ function App() {
 
       {/* ═══════ Main Content ═══════ */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-10">
-        {activeTab === 'dashboard' && <MainDashboard />}
+        {activeTab === 'dashboard' && <MainDashboard owner={owner} />}
         {activeTab === 'archive' && <ArchiveGrid />}
         {activeTab === 'exhibition' && <ExhibitionHall />}
       </main>
