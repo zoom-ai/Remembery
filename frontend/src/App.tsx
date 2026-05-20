@@ -3,7 +3,7 @@
  * Tab-based navigation between Dashboard, Archive, and Exhibition.
  */
 import { useState, useEffect } from 'react'
-import { Home, Archive, Landmark, Heart, Loader2, History, FileText } from 'lucide-react'
+import { Home, Archive, Landmark, Heart, Loader2, History, FileText, TrendingUp } from 'lucide-react'
 import { userAPI, type User } from './services/api'
 
 import MainDashboard from './components/MainDashboard'
@@ -12,14 +12,16 @@ import ExhibitionHall from './components/ExhibitionHall'
 import Onboarding from './components/Onboarding'
 import TimelineFlow from './components/TimelineFlow'
 import ResumeImporter from './components/ResumeImporter'
+import CareerInsight from './components/CareerInsight'
 
-type Tab = 'dashboard' | 'archive' | 'timeline' | 'resume' | 'exhibition'
+type Tab = 'dashboard' | 'archive' | 'timeline' | 'resume' | 'insight' | 'exhibition'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard',  label: '대시보드',   icon: Home },
   { key: 'archive',    label: '보관함',     icon: Archive },
   { key: 'timeline',   label: '타임라인',   icon: History },
   { key: 'resume',     label: '이력서',     icon: FileText },
+  { key: 'insight',    label: '인사이트',   icon: TrendingUp },
   { key: 'exhibition', label: '전시관',     icon: Landmark },
 ]
 
@@ -107,6 +109,7 @@ function App() {
         {activeTab === 'archive' && <ArchiveGrid />}
         {activeTab === 'timeline' && <TimelineFlow owner={owner} />}
         {activeTab === 'resume' && <ResumeImporter onImported={() => setActiveTab('archive')} />}
+        {activeTab === 'insight' && <CareerInsight owner={owner} />}
         {activeTab === 'exhibition' && <ExhibitionHall />}
       </main>
 
