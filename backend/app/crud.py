@@ -190,6 +190,7 @@ def create_archive_item(db: Session, item: schemas.ArchiveItemCreate) -> models.
         metadata_json=item.metadata_json,
         original_date=item.original_date,
         source=item.source,
+        custom_attributes=item.custom_attributes,
         is_public=item.is_public,
     )
     db.add(db_item)

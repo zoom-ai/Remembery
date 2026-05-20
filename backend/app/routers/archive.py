@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 import os
 import uuid
 import re
+import json
 
 from app import models, crud, schemas
 from app.database import get_db
@@ -118,6 +119,7 @@ def upload_archive_item(
     item_type: Optional[str] = Form(None),
     tags: Optional[str] = Form(""),
     metadata_json: Optional[str] = Form(None),
+    custom_attributes: Optional[str] = Form(None),
     source: Optional[str] = Form(None),
     auto_index: bool = Form(False),
     file: Optional[UploadFile] = File(None),
@@ -160,6 +162,16 @@ def upload_archive_item(
         file_url = f"/uploads/{cat_dir_name}/{unique_filename}"
 
     # 2. Create the ArchiveItem record
+    custom_attrs_dict = None
+    if custom_attributes:
+        try:
+            custom_attrs_dict = json.loads(custom_attributes)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid JSON format for custom_attributes: {e}"
+            )
+
     item_schema = schemas.ArchiveItemCreate(
         owner_id=owner_id,
         category_id=category_id,
@@ -170,6 +182,7 @@ def upload_archive_item(
         thumbnail_url=None,
         tags=tags,
         metadata_json=metadata_json,
+        custom_attributes=custom_attrs_dict,
         original_date=None,
         source=source,
         is_public=False,

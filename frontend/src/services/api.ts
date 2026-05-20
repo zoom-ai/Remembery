@@ -89,6 +89,7 @@ export interface ArchiveItem {
   ai_summary: string | null
   highlight_quote: string | null
   preview_url: string | null
+  custom_attributes: Record<string, any> | null
   created_at: string
   updated_at: string
 }
@@ -185,6 +186,7 @@ export const archiveAPI = {
     source?: string
     auto_index?: boolean
     file?: File
+    custom_attributes?: Record<string, any>
   }) => {
     const formData = new FormData()
     formData.append('owner_id', String(data.owner_id))
@@ -196,6 +198,7 @@ export const archiveAPI = {
     if (data.source) formData.append('source', data.source)
     if (data.auto_index) formData.append('auto_index', String(data.auto_index))
     if (data.file) formData.append('file', data.file)
+    if (data.custom_attributes) formData.append('custom_attributes', JSON.stringify(data.custom_attributes))
 
     return API.post('/archive/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }

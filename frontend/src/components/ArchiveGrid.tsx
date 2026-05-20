@@ -308,7 +308,20 @@ function SidebarItem({ label, icon: Icon, isActive, color, count, onClick, onDel
   )
 }
 
-/* ─── ArchiveCard ──────────────────────────────────────── */
+/* ─── ArchiveCard Helpers ───────────────────────────────── */
+function getLocalizedKey(key: string): string {
+  const map: Record<string, string> = {
+    location: '촬영 장소',
+    taken_with: '촬영 기기',
+    weather: '날씨',
+    emotion: '오늘의 감정',
+    authors: '저자',
+    journal: '학술지',
+    doi: 'DOI',
+  }
+  return map[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 /* ─── ArchiveCard ──────────────────────────────────────── */
 function ArchiveCard({ item, categories, isExpanded, onToggle }: {
   item: ArchiveItem
@@ -408,6 +421,19 @@ function ArchiveCard({ item, categories, isExpanded, onToggle }: {
                 </p>
               </div>
             )}
+
+            {item.custom_attributes && Object.keys(item.custom_attributes).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {Object.entries(item.custom_attributes).slice(0, 3).map(([key, val]) => (
+                  val ? (
+                    <span key={key} className="text-[8.5px] bg-white/[0.04] text-[var(--parchment)]/70 px-2 py-0.5 rounded border border-white/5 backdrop-blur-sm">
+                      <span className="font-bold text-[#C5A880]/90 mr-1">{getLocalizedKey(key)}:</span>
+                      {String(val)}
+                    </span>
+                  ) : null
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="pt-2 border-t border-white/5 flex items-center justify-between">
@@ -502,6 +528,23 @@ function ArchiveCard({ item, categories, isExpanded, onToggle }: {
                     "{item.highlight_quote}"
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Custom Attributes Details */}
+            {item.custom_attributes && Object.keys(item.custom_attributes).length > 0 && (
+              <div className="space-y-2 pt-3 border-t border-[var(--linen)]">
+                <h4 className="text-[10px] font-bold text-[var(--taupe)] uppercase tracking-wider">기록 상세 속성</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {Object.entries(item.custom_attributes).map(([key, val]) => (
+                    val ? (
+                      <div key={key} className="flex flex-col p-2.5 rounded-xl bg-[var(--linen)]/35 border border-[var(--linen)] hover:bg-[var(--linen)]/60 transition-colors duration-300">
+                        <span className="text-[9px] text-[var(--taupe)] font-bold">{getLocalizedKey(key)}</span>
+                        <span className="text-xs text-[var(--charcoal)] font-semibold mt-0.5">{String(val)}</span>
+                      </div>
+                    ) : null
+                  ))}
+                </div>
               </div>
             )}
 

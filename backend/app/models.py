@@ -202,6 +202,7 @@ class ArchiveItem(Base):
     ai_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # AI core summary
     highlight_quote: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # Highlight quote from text/book
     preview_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True) # Thumbnail or 3sec GIF
+    custom_attributes: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True) # Category custom fields (JSON)
 
     # Lifecycle
     is_public: Mapped[bool]         = mapped_column(Boolean, default=True)

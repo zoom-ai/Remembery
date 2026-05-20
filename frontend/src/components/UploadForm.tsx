@@ -22,8 +22,40 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [catOpen, setCatOpen] = useState(false)
+  const [customAttrs, setCustomAttrs] = useState<Record<string, string>>({})
 
   const selectedCat = categories.find(c => c.id === categoryId)
+
+  const getCustomFieldsForCategory = (catName: string) => {
+    const name = catName.toLowerCase()
+    if (name.includes('사진') || name.includes('이미지') || name.includes('photo') || name.includes('image')) {
+      return [
+        { key: 'location', label: '촬영 장소', placeholder: '예: 서울 시립 미술관' },
+        { key: 'taken_with', label: '촬영 기기 / 카메라', placeholder: '예: Sony A7 IV' },
+        { key: 'weather', label: '날씨', placeholder: '예: 맑음, 흐림' },
+      ]
+    }
+    if (name.includes('논문') || name.includes('paper') || name.includes('research') || name.includes('academic')) {
+      return [
+        { key: 'authors', label: '저자', placeholder: '예: 홍길동, 김철수' },
+        { key: 'journal', label: '학술지 / 게재지', placeholder: '예: Nature, IEEE' },
+        { key: 'doi', label: 'DOI', placeholder: '예: 10.1000/xyz123' },
+      ]
+    }
+    if (name.includes('일기') || name.includes('diary') || name.includes('journal')) {
+      return [
+        { key: 'weather', label: '날씨', placeholder: '예: 맑음, 비 옴' },
+        { key: 'emotion', label: '오늘의 감정', placeholder: '예: 기쁨, 고요함, 사색적' },
+      ]
+    }
+    return []
+  }
+
+  const handleSelectCategory = (catId: number | '') => {
+    setCategoryId(catId)
+    setCustomAttrs({}) // Reset dynamic custom attributes
+    setCatOpen(false)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,6 +72,7 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
         source: source.trim() || undefined,
         auto_index: true,
         file: file || undefined,
+        custom_attributes: Object.keys(customAttrs).length > 0 ? customAttrs : undefined,
       })
       onUploaded()
       onClose()
@@ -126,7 +159,7 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
                   {/* Unset option */}
                   <button
                     type="button"
-                    onClick={() => { setCategoryId(''); setCatOpen(false) }}
+                    onClick={() => handleSelectCategory('')}
                     className="w-full px-4 py-2.5 text-left text-sm text-[var(--taupe)] hover:bg-[var(--linen)] transition"
                   >
                     — 선택 안 함
@@ -139,7 +172,7 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
                       <div className="px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest text-[var(--taupe)]">기본</div>
                       {categories.filter(c => c.is_default).map(cat => (
                         <button key={cat.id} type="button"
-                          onClick={() => { setCategoryId(cat.id); setCatOpen(false) }}
+                          onClick={() => handleSelectCategory(cat.id)}
                           className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 transition ${categoryId === cat.id ? 'bg-[var(--linen)]' : 'hover:bg-[var(--linen)]'}`}
                         >
                           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#8c8278' }} />
@@ -156,7 +189,7 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
                       <div className="px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest text-[var(--taupe)]">내 카테고리</div>
                       {categories.filter(c => !c.is_default).map(cat => (
                         <button key={cat.id} type="button"
-                          onClick={() => { setCategoryId(cat.id); setCatOpen(false) }}
+                          onClick={() => handleSelectCategory(cat.id)}
                           className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 transition ${categoryId === cat.id ? 'bg-[var(--linen)]' : 'hover:bg-[var(--linen)]'}`}
                         >
                           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color || '#8c8278' }} />
@@ -169,6 +202,29 @@ export default function UploadForm({ categories, onUploaded, onClose }: Props) {
               )}
             </div>
           </div>
+
+          {/* Dynamic Custom Fields */}
+          {selectedCat && getCustomFieldsForCategory(selectedCat.name).length > 0 && (
+            <div className="p-4 rounded-xl bg-[var(--linen)]/40 border border-[var(--linen)] space-y-3.5 animate-fade-in">
+              <h4 className="text-[10px] font-bold text-[var(--umber)] uppercase tracking-wider flex items-center gap-1.5">
+                ✦ {selectedCat.name} 상세 정보 입력
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {getCustomFieldsForCategory(selectedCat.name).map(field => (
+                  <div key={field.key} className={field.key === 'location' || field.key === 'authors' ? 'sm:col-span-2' : ''}>
+                    <label className={labelClass}>{field.label}</label>
+                    <input
+                      type="text"
+                      value={customAttrs[field.key] || ''}
+                      onChange={e => setCustomAttrs(prev => ({ ...prev, [field.key]: e.target.value }))}
+                      placeholder={field.placeholder}
+                      className={fieldClass}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Description */}
           <div>

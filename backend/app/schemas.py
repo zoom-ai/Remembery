@@ -5,7 +5,7 @@ Request / Response validation schemas for all core entities.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, EmailStr
 
 
@@ -111,6 +111,7 @@ class ArchiveItemBase(BaseModel):
     ai_summary: Optional[str] = None
     highlight_quote: Optional[str] = None
     preview_url: Optional[str] = None
+    custom_attributes: Optional[Dict[str, Any]] = None
     is_public: Optional[bool] = True
 
 class ArchiveItemCreate(ArchiveItemBase):
