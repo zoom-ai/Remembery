@@ -94,6 +94,13 @@ class CategoryResponse(CategoryBase):
     class Config:
         from_attributes = True
 
+
+class CustomFieldSuggestion(BaseModel):
+    key: str = Field(..., description="영문 key")
+    label: str = Field(..., description="한국어 설명")
+    type: str = Field(..., description="데이터 타입 (e.g. 'text', 'date', 'number')")
+
+
 # ─────────────────────────────────────────────────────────
 # ArchiveItem Schemas
 # ─────────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app import models, crud, schemas
 from app.database import get_db
+from app.services import ai_service
 
 router = APIRouter(
     prefix="/categories",
@@ -81,6 +82,28 @@ def list_categories(
     db: Session = Depends(get_db),
 ):
     return crud.get_categories(db, user_id=user_id, include_defaults=True)
+
+
+# ─────────────────────────────────────────────────────────
+# GET /suggest-fields — Suggest custom fields based on category name
+# ─────────────────────────────────────────────────────────
+@router.get(
+    "/suggest-fields",
+    response_model=List[schemas.CustomFieldSuggestion],
+    summary="Get AI-suggested custom fields for a category name",
+    description="Calls the Gemini API to get a tailored list of custom fields "
+                "or returns a high-quality local fallback recommendation.",
+)
+def suggest_fields(
+    category_name: str = Query(..., description="The name of the category (e.g. '학술 논문')"),
+    db: Session = Depends(get_db),
+):
+    if not category_name or not category_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Category name query parameter is required.",
+        )
+    return ai_service.suggest_custom_fields_ai(category_name)
 
 
 # ─────────────────────────────────────────────────────────

@@ -2,8 +2,8 @@
  * NewCategoryModal — 카테고리 생성 모달
  */
 import { useState } from 'react'
-import { X, Loader2, FolderPlus } from 'lucide-react'
-import { categoryAPI, type Category } from '../services/api'
+import { X, Loader2, FolderPlus, Sparkles, Check } from 'lucide-react'
+import { categoryAPI, type Category, type CustomFieldSuggestion } from '../services/api'
 
 const COLOR_SWATCHES = [
   '#6b5b4e','#0ea5e9','#f59e0b','#ef4444',
@@ -23,6 +23,27 @@ export default function NewCategoryModal({ userId, onCreated, onClose }: Props) 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // AI Field Suggestion States
+  const [suggestions, setSuggestions] = useState<CustomFieldSuggestion[]>([])
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const [isSuggesting, setIsSuggesting] = useState(false)
+  const [suggestionError, setSuggestionError] = useState('')
+
+  const handleSuggestFields = async () => {
+    if (!name.trim()) return
+    setIsSuggesting(true)
+    setSuggestionError('')
+    try {
+      const res = await categoryAPI.suggestFields(name.trim())
+      setSuggestions(res.data)
+      setSelectedKeys(res.data.map(f => f.key))
+    } catch (err: any) {
+      setSuggestionError('AI 추천 필드를 가져오는 데 실패했습니다.')
+    } finally {
+      setIsSuggesting(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
@@ -35,6 +56,13 @@ export default function NewCategoryModal({ userId, onCreated, onClose }: Props) 
         color,
         user_id: userId,
       })
+      
+      // Save approved custom fields to localStorage
+      const approvedFields = suggestions.filter(f => selectedKeys.includes(f.key))
+      if (approvedFields.length > 0) {
+        localStorage.setItem(`category_custom_fields_${res.data.id}`, JSON.stringify(approvedFields))
+      }
+
       onCreated(res.data)
       onClose()
     } catch (err: any) {
@@ -79,13 +107,107 @@ export default function NewCategoryModal({ userId, onCreated, onClose }: Props) 
             <input
               type="text"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => {
+                setName(e.target.value)
+                // Clear previous suggestions if name changes significantly
+                if (suggestions.length > 0) {
+                  setSuggestions([])
+                  setSelectedKeys([])
+                }
+              }}
               placeholder="예: 연구 논문, 가족 편지, 골프 스코어카드"
               required
               maxLength={100}
               className="w-full px-4 py-2.5 rounded-xl museum-input text-sm"
             />
+            
+            {name.trim().length >= 2 && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleSuggestFields}
+                  disabled={isSuggesting}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--linen)] text-[var(--umber)] text-[11px] font-semibold hover:bg-[var(--linen)]/80 hover:text-[var(--museum)] active:scale-95 disabled:opacity-50 transition-all shadow-sm border border-[var(--linen)] animate-fade-in"
+                >
+                  {isSuggesting ? (
+                    <Loader2 className="w-3 h-3 animate-spin text-[var(--umber)]" />
+                  ) : (
+                    <Sparkles className="w-3 h-3 text-[var(--umber)] animate-pulse" />
+                  )}
+                  AI 추천 필드 받기
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* AI Suggestions Checklist */}
+          {suggestions.length > 0 && (
+            <div className="p-4 rounded-xl bg-gradient-to-br from-[var(--linen)]/30 to-[var(--linen)]/10 border border-[var(--linen)]/60 space-y-2.5 animate-fade-in shadow-inner">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-bold text-[var(--umber)] uppercase tracking-wider flex items-center gap-1.5 font-display">
+                  <Sparkles className="w-3 h-3 text-[var(--umber)]" />
+                  Gemini 추천 맞춤형 메타데이터
+                </h4>
+                <span className="text-[9px] text-[var(--taupe)] bg-[var(--ivory)] px-1.5 py-0.5 rounded border border-[var(--linen)]">AI 제안</span>
+              </div>
+              <p className="text-[10px] text-[var(--taupe)] leading-relaxed">
+                자료 보관 시 함께 기록할 항목을 선택해 주세요. 승인하시면 기본 커스텀 필드로 등록됩니다.
+              </p>
+              
+              <div className="grid grid-cols-1 gap-2 mt-2">
+                {suggestions.map(field => {
+                  const isChecked = selectedKeys.includes(field.key)
+                  return (
+                    <label
+                      key={field.key}
+                      className={`flex items-center justify-between p-2.5 rounded-lg border text-left cursor-pointer transition-all duration-200 active:scale-98 ${
+                        isChecked
+                          ? 'border-[var(--umber)]/50 bg-[var(--ivory)] shadow-sm'
+                          : 'border-[var(--linen)] bg-[var(--ivory)]/35 hover:bg-[var(--linen)]/10'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setSelectedKeys(prev => prev.filter(k => k !== field.key))
+                            } else {
+                              setSelectedKeys(prev => [...prev, field.key])
+                            }
+                          }}
+                          className="mt-1 rounded border-[var(--linen)] text-[var(--umber)] focus:ring-[var(--umber)] cursor-pointer"
+                        />
+                        <div>
+                          <div className="text-xs font-semibold text-[var(--charcoal)] flex items-center gap-1.5">
+                            {field.label}
+                            <span className="text-[8px] font-mono uppercase px-1 rounded bg-[var(--linen)] text-[var(--taupe)]">
+                              {field.type}
+                            </span>
+                          </div>
+                          <div className="text-[9px] text-[var(--taupe)] font-mono mt-0.5">
+                            Key: {field.key}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
+                        isChecked ? 'bg-[var(--umber)] text-white scale-100' : 'bg-transparent text-transparent border border-[var(--linen)] scale-90'
+                      }`}>
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {suggestionError && (
+            <p className="text-xs text-rose-500 bg-rose-50 border border-rose-100 rounded-xl px-4 py-2">
+              {suggestionError}
+            </p>
+          )}
 
           {/* Description */}
           <div>

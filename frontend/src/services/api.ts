@@ -71,6 +71,12 @@ export interface Category {
   created_at: string
 }
 
+export interface CustomFieldSuggestion {
+  key: string
+  label: string
+  type: string
+}
+
 export interface ArchiveItem {
   id: number
   owner_id: number
@@ -162,6 +168,9 @@ export const categoryAPI = {
   delete: (id: number) => API.delete(`/categories/${id}`),
 
   seed: () => API.post<Category[]>('/categories/seed'),
+
+  suggestFields: (categoryName: string) =>
+    API.get<CustomFieldSuggestion[]>('/categories/suggest-fields', { params: { category_name: categoryName } }),
 }
 
 /* ────────────── Archive API ────────────── */
@@ -206,6 +215,14 @@ export const archiveAPI = {
   },
 
   getOne: (id: number) => API.get<ArchiveItem>(`/archive/${id}`),
+
+  parseExif: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return API.post<Record<string, any>>('/archive/parse-exif', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
 }
 
 export const userAPI = {

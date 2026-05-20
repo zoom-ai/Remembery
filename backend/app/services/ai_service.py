@@ -3,7 +3,7 @@ import json
 import urllib.request
 import base64
 import re
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 # Resolve Gemini API Key from environment or manual .env file
 # Try to load .env manually from the backend root
@@ -92,7 +92,80 @@ def _extract_text_from_file(file_path: str) -> str:
     return ""
 
 
-def analyze_document(file_path: Optional[str], title: str, description: Optional[str] = None) -> Dict[str, Optional[str]]:
+def synthesize_custom_attributes(custom_attrs: Optional[dict], category_name: str) -> str:
+    """
+    Synthesizes custom attributes into premium, localized Korean sentences
+    based on the archive item's category.
+    """
+    if not custom_attrs or not isinstance(custom_attrs, dict):
+        return ""
+        
+    sentences = []
+    cat_lower = category_name.lower() if category_name else ""
+    
+    # 1. Papers / 논문
+    if any(k in cat_lower for k in ["논문", "research", "paper", "academic"]):
+        authors = custom_attrs.get("authors") or custom_attrs.get("author") or custom_attrs.get("저자")
+        journal = custom_attrs.get("journal") or custom_attrs.get("저널명") or custom_attrs.get("저널") or custom_attrs.get("학술지")
+        doi = custom_attrs.get("doi")
+        
+        if authors and journal:
+            sentences.append(f"이 자료는 {authors}가 쓴 논문이며, {journal}에 게재되었습니다.")
+        elif authors:
+            sentences.append(f"이 자료는 {authors}가 저술한 논문 자료입니다.")
+        elif journal:
+            sentences.append(f"이 자료는 {journal} 학술지에 게재된 논문입니다.")
+            
+        if doi:
+            sentences.append(f"논문의 DOI 식별자는 {doi}입니다.")
+
+    # 2. Diaries / 일기
+    elif any(k in cat_lower for k in ["일기", "diary", "journal"]):
+        weather = custom_attrs.get("weather") or custom_attrs.get("날씨")
+        emotion = custom_attrs.get("emotion") or custom_attrs.get("감정") or custom_attrs.get("오늘 느낀 감정")
+        
+        if weather and emotion:
+            sentences.append(f"기록 당시 날씨는 {weather}였으며, 오늘의 감정은 {emotion}이었습니다.")
+        elif weather:
+            sentences.append(f"기록 당시 날씨는 {weather}였습니다.")
+        elif emotion:
+            sentences.append(f"이 일기를 기록할 당시 감정은 {emotion}이었습니다.")
+
+    # 3. Photos / 사진
+    elif any(k in cat_lower for k in ["사진", "photo", "image", "이미지"]):
+        location = custom_attrs.get("location") or custom_attrs.get("촬영 장소") or custom_attrs.get("장소")
+        taken_with = custom_attrs.get("taken_with") or custom_attrs.get("촬영 기기") or custom_attrs.get("기기") or custom_attrs.get("camera") or custom_attrs.get("카메라")
+        
+        if location and taken_with:
+            sentences.append(f"이 사진은 {location}에서 촬영되었으며, {taken_with} 카메라로 찍었습니다.")
+        elif location:
+            sentences.append(f"이 사진은 {location}에서 촬영되었습니다.")
+        elif taken_with:
+            sentences.append(f"이 사진은 {taken_with} 카메라로 촬영되었습니다.")
+
+    # 4. Generic fallback for any other category or remaining custom attributes
+    exclude_keys = {"authors", "author", "저자", "journal", "저널명", "저널", "학술지", "doi", 
+                    "weather", "날씨", "emotion", "감정", "오늘 느낀 감정", 
+                    "location", "촬영 장소", "장소", "taken_with", "촬영 기기", "기기", "camera", "카메라"}
+                    
+    other_attrs = {k: v for k, v in custom_attrs.items() if k not in exclude_keys and v}
+    if other_attrs:
+        fallback_parts = []
+        for key, val in other_attrs.items():
+            fallback_parts.append(f"{key}은(는) '{val}'")
+        if fallback_parts:
+            sentences.append("추가 정보로 " + ", ".join(fallback_parts) + "입니다.")
+            
+    return " ".join(sentences)
+
+
+def analyze_document(
+    file_path: Optional[str],
+    title: str,
+    description: Optional[str] = None,
+    custom_attributes: Optional[dict] = None,
+    category_name: Optional[str] = None
+) -> Dict[str, Optional[str]]:
     """
     Analyze a PDF or TXT document/book to extract:
     - ai_summary (1-2 sentences core summary in Korean)
@@ -102,16 +175,22 @@ def analyze_document(file_path: Optional[str], title: str, description: Optional
     if file_path:
         text_content = _extract_text_from_file(file_path)
 
+    synthesized_context = synthesize_custom_attributes(custom_attributes, category_name or "Document")
+
     # 1. Use real Gemini API if key is available
     if GEMINI_API_KEY:
+        context_prompt = ""
+        if synthesized_context:
+            context_prompt = f"\nContextual facts about this document:\n{synthesized_context}\n"
+
         contents = [
             {
                 "parts": [
                     {
                         "text": f"""
-                        You are an expert personal archivist. Below is the text content from a preserved document/book titled '{title}'.
+                        You are an expert personal archivist. Below is the text content from a preserved document/book titled '{title}'.{context_prompt}
                         Your task is to analyze this text and extract:
-                        1. 'ai_summary': A 1-2 sentence core summary of this record in Korean. Make it feel warm, respectful, and emotional yet accurate.
+                        1. 'ai_summary': A 1-2 sentence core summary of this record in Korean. Make it feel warm, respectful, and emotional yet accurate. If contextual facts are provided above, weave them naturally into the summary where relevant.
                         2. 'highlight_quote': One of the most emotional, philosophical, inspiring, or memorable quotes directly extracted from the text in Korean. It must exist in the text.
                         
                         Text content snippet:
@@ -143,6 +222,9 @@ def analyze_document(file_path: Optional[str], title: str, description: Optional
     if description:
         fallback_summary = f"'{title}'에 관한 기록입니다. {description}"
 
+    if synthesized_context:
+        fallback_summary = f"{fallback_summary} {synthesized_context}"
+
     fallback_quote = "기록한다는 것은 우리의 삶이 결코 바람 속에 사라지지 않게 하는 가장 아름다운 방법이다."
     
     # Try to extract a realistic quote from actual text if available
@@ -164,10 +246,18 @@ def analyze_document(file_path: Optional[str], title: str, description: Optional
     }
 
 
-def analyze_image(file_path: Optional[str], title: str, description: Optional[str] = None) -> Dict[str, Optional[str]]:
+def analyze_image(
+    file_path: Optional[str],
+    title: str,
+    description: Optional[str] = None,
+    custom_attributes: Optional[dict] = None,
+    category_name: Optional[str] = None
+) -> Dict[str, Optional[str]]:
     """
     Analyze an uploaded photograph to generate a caption (ai_summary) using Gemini Vision.
     """
+    synthesized_context = synthesize_custom_attributes(custom_attributes, category_name or "Photo")
+
     if file_path and os.path.exists(file_path) and GEMINI_API_KEY:
         try:
             # Base64 encode the image
@@ -180,6 +270,10 @@ def analyze_image(file_path: Optional[str], title: str, description: Optional[st
             elif file_path.lower().endswith(".webp"):
                 mime_type = "image/webp"
 
+            context_prompt = ""
+            if synthesized_context:
+                context_prompt = f"\nContextual facts about this photograph:\n{synthesized_context}\n"
+
             contents = [
                 {
                     "parts": [
@@ -191,9 +285,9 @@ def analyze_image(file_path: Optional[str], title: str, description: Optional[st
                         },
                         {
                             "text": f"""
-                            You are an expert personal archivist. Analyze the attached photograph titled '{title}'.
+                            You are an expert personal archivist. Analyze the attached photograph titled '{title}'.{context_prompt}
                             Describe the emotional and factual scene/situation in this photo in 1-2 warm, meaningful, and respectful sentences in Korean.
-                            This will serve as a caption summary for the digital memorial gallery.
+                            This will serve as a caption summary for the digital memorial gallery. If contextual facts are provided above, weave them naturally into the description where relevant.
                             
                             Format the response strictly as a JSON object with key: "ai_summary".
                             """
@@ -221,26 +315,41 @@ def analyze_image(file_path: Optional[str], title: str, description: Optional[st
     if description:
         fallback_summary = f"사진속 순간: {description}"
         
+    if synthesized_context:
+        fallback_summary = f"{fallback_summary} {synthesized_context}"
+
     return {
         "ai_summary": fallback_summary,
         "highlight_quote": None
     }
 
 
-def analyze_video(file_path: Optional[str], title: str, description: Optional[str] = None) -> Dict[str, Optional[str]]:
+def analyze_video(
+    file_path: Optional[str],
+    title: str,
+    description: Optional[str] = None,
+    custom_attributes: Optional[dict] = None,
+    category_name: Optional[str] = None
+) -> Dict[str, Optional[str]]:
     """
     Analyze video details to generate a warm descriptive summary (ai_summary).
     """
+    synthesized_context = synthesize_custom_attributes(custom_attributes, category_name or "Video")
+
     if GEMINI_API_KEY:
+        context_prompt = ""
+        if synthesized_context:
+            context_prompt = f"\nContextual facts about this video:\n{synthesized_context}\n"
+
         contents = [
             {
                 "parts": [
                     {
                         "text": f"""
-                        You are an expert personal archivist. Analyze the details of a preserved video titled '{title}'.
+                        You are an expert personal archivist. Analyze the details of a preserved video titled '{title}'.{context_prompt}
                         Description: {description or 'None provided'}
                         
-                        Write a warm, meaningful, and descriptive 1-2 sentence summary of this video in Korean based on these details.
+                        Write a warm, meaningful, and descriptive 1-2 sentence summary of this video in Korean based on these details. If contextual facts are provided above, weave them naturally into the summary where relevant.
                         
                         Format the response strictly as a JSON object with key: "ai_summary".
                         """
@@ -266,7 +375,122 @@ def analyze_video(file_path: Optional[str], title: str, description: Optional[st
     if description:
         fallback_summary = f"영상 요약: {description}"
 
+    if synthesized_context:
+        fallback_summary = f"{fallback_summary} {synthesized_context}"
+
     return {
         "ai_summary": fallback_summary,
         "highlight_quote": None
     }
+
+
+def suggest_custom_fields_ai(category_name: str) -> List[Dict[str, str]]:
+    """
+    Calls the Gemini API to get a tailored list of suggested custom fields (metadata attributes)
+    for a given category name. If the API is not available or fails, returns a high-quality local fallback.
+    """
+    # 1. Local smart fallbacks based on keywords
+    cat_lower = category_name.lower() if category_name else ""
+    
+    # Defaults
+    fallback_suggestions = [
+        {"key": "notes", "label": "추가 메모", "type": "text"},
+        {"key": "importance", "label": "중요도", "type": "number"}
+    ]
+    
+    if any(k in cat_lower for k in ["논문", "research", "paper", "academic", "학술"]):
+        fallback_suggestions = [
+            {"key": "authors", "label": "저자", "type": "text"},
+            {"key": "journal", "label": "저널명", "type": "text"},
+            {"key": "doi", "label": "DOI 주소", "type": "text"},
+            {"key": "published_date", "label": "발행일", "type": "date"}
+        ]
+    elif any(k in cat_lower for k in ["일기", "diary", "journal", "기록"]):
+        fallback_suggestions = [
+            {"key": "weather", "label": "날씨", "type": "text"},
+            {"key": "emotion", "label": "오늘 느낀 감정", "type": "text"},
+            {"key": "location", "label": "기록 장소", "type": "text"}
+        ]
+    elif any(k in cat_lower for k in ["사진", "photo", "image", "이미지", "그림"]):
+        fallback_suggestions = [
+            {"key": "location", "label": "촬영 장소", "type": "text"},
+            {"key": "taken_with", "label": "촬영 기기", "type": "text"},
+            {"key": "taken_date", "label": "촬영 일자", "type": "date"}
+        ]
+    elif any(k in cat_lower for k in ["동영상", "video", "영상", "영화"]):
+        fallback_suggestions = [
+            {"key": "location", "label": "촬영 장소", "type": "text"},
+            {"key": "duration", "label": "영상 길이", "type": "text"},
+            {"key": "participants", "label": "함께 한 사람들", "type": "text"}
+        ]
+    elif any(k in cat_lower for k in ["음성", "오디오", "audio", "녹음"]):
+        fallback_suggestions = [
+            {"key": "speaker", "label": "말하는 사람", "type": "text"},
+            {"key": "recorded_at", "label": "녹음 장소", "type": "text"},
+            {"key": "duration", "label": "재생 시간", "type": "text"}
+        ]
+    elif any(k in cat_lower for k in ["여행", "travel", "trip"]):
+        fallback_suggestions = [
+            {"key": "destination", "label": "여행지", "type": "text"},
+            {"key": "travel_period", "label": "여행 기간", "type": "text"},
+            {"key": "companions", "label": "동반자", "type": "text"}
+        ]
+
+    if not GEMINI_API_KEY:
+        print("[AI Service] No Gemini API key found. Using local custom fields fallback suggestions.")
+        return fallback_suggestions
+
+    prompt = f"""
+    사용자가 라이브러리에 '{category_name}'라는 카테고리를 만들려고 합니다. 이 카테고리의 디지털 자료를 관리할 때 필요한 맞춤형 메타데이터 속성명(영문 key)과 한국어 설명(label), 그리고 데이터 타입(type: 'text', 'date', 'number' 등)을 포함한 JSON 배열을 다른 텍스트 없이 오직 유효한 JSON 형식으로만 반환해 주세요.
+    
+    반환 구조 예시:
+    [
+      {{"key": "doi", "label": "DOI 주소", "type": "text"}},
+      {{"key": "authors", "label": "저자", "type": "text"}}
+    ]
+    
+    최대 4-5개의 실용적이고 가장 권장되는 필드를 추천해 주세요. 오직 JSON 배열만 반환해 주세요. Markdown 백틱(```)이나 다른 설명 텍스트를 포함하지 마세요.
+    """
+
+    contents = [
+        {
+            "parts": [
+                {
+                    "text": prompt
+                }
+            ]
+        }
+    ]
+
+    try:
+        response_text = _call_gemini_api(contents)
+        if response_text:
+            # Clean response text just in case Gemini outputs markdown code block
+            clean_text = response_text.strip()
+            if clean_text.startswith("```json"):
+                clean_text = clean_text[7:]
+            if clean_text.startswith("```"):
+                clean_text = clean_text[3:]
+            if clean_text.endswith("```"):
+                clean_text = clean_text[:-3]
+            clean_text = clean_text.strip()
+            
+            parsed = json.loads(clean_text)
+            if isinstance(parsed, list):
+                # Validate the fields
+                validated_suggestions = []
+                for item in parsed:
+                    if isinstance(item, dict) and "key" in item and "label" in item and "type" in item:
+                        validated_suggestions.append({
+                            "key": str(item["key"]),
+                            "label": str(item["label"]),
+                            "type": str(item["type"])
+                        })
+                if validated_suggestions:
+                    print(f"[AI Service] Successfully generated {len(validated_suggestions)} custom fields from Gemini.")
+                    return validated_suggestions
+    except Exception as e:
+        print(f"[AI Service ERROR] Failed parsing Gemini category suggestions: {e}")
+
+    print("[AI Service] Falling back to local category suggestions rules.")
+    return fallback_suggestions

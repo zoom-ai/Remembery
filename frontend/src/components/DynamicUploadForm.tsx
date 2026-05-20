@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { Upload, X, Loader2, ChevronDown, Tag, Calendar, MapPin, Feather, FileText, CloudSun } from 'lucide-react'
 import { archiveAPI, type Category } from '../services/api'
+import UploadPreview from './UploadPreview'
 
 interface Props {
   categories: Category[]
@@ -26,10 +27,63 @@ export default function DynamicUploadForm({ categories, onUploaded, onClose }: P
   // 동적 필드 저장을 위한 State (custom_attributes)
   const [customAttrs, setCustomAttrs] = useState<Record<string, string>>({})
 
+  // EXIF Metadata States
+  const [exifData, setExifData] = useState<any | null>(null)
+  const [isExifLoading, setIsExifLoading] = useState(false)
+  const [exifError, setExifError] = useState(false)
+
   const selectedCat = categories.find(c => c.id === categoryId)
 
-  // 카테고리 이름 분석을 통한 동적 필드 사양 정의
-  const getDynamicFields = (catName: string) => {
+  // Format EXIF date string (YYYY:MM:DD HH:MM:SS) to standard input format (YYYY-MM-DD)
+  const formatExifDateToInput = (dateStr: string) => {
+    if (!dateStr) return ''
+    const parts = dateStr.trim().split(' ')
+    if (parts[0]) {
+      return parts[0].replace(/:/g, '-')
+    }
+    return ''
+  }
+
+  // 카테고리 이름 분석 또는 로컬 레지스트리를 통한 동적 필드 사양 정의
+  const getDynamicFields = (catName: string, catId?: number) => {
+    // 1. 로컬 스토리지에 등록된 커스텀 필드 스키마 확인
+    if (catId) {
+      const saved = localStorage.getItem(`category_custom_fields_${catId}`)
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map((f: any) => {
+              // 타입 또는 키값 매칭을 통해 어울리는 프리미엄 아이콘 할당
+              let IconComponent = Feather
+              const keyLower = String(f.key).toLowerCase()
+              const typeLower = String(f.type).toLowerCase()
+              
+              if (typeLower === 'date' || keyLower.includes('date') || keyLower.includes('day') || keyLower.includes('일자') || keyLower.includes('날짜')) {
+                IconComponent = Calendar
+              } else if (keyLower.includes('location') || keyLower.includes('place') || keyLower.includes('장소') || keyLower.includes('gps')) {
+                IconComponent = MapPin
+              } else if (keyLower.includes('weather') || keyLower.includes('날씨')) {
+                IconComponent = CloudSun
+              } else if (keyLower.includes('journal') || keyLower.includes('book') || keyLower.includes('저널') || keyLower.includes('학술')) {
+                IconComponent = FileText
+              }
+              
+              return {
+                key: f.key,
+                label: f.label,
+                placeholder: `예: ${f.label} 입력`,
+                icon: IconComponent
+              }
+            })
+          }
+        } catch (e) {
+          console.error('[DynamicUploadForm] Failed to parse custom fields schema:', e)
+        }
+      }
+    }
+
+    // 2. Fallback to default system categories rules
     const name = catName.toLowerCase()
     if (name.includes('논문') || name.includes('paper') || name.includes('research') || name.includes('academic')) {
       return [
@@ -51,11 +105,125 @@ export default function DynamicUploadForm({ categories, onUploaded, onClose }: P
     return []
   }
 
-  // 카테고리 변경 시 동적 필드 초기화
+  const dynamicFields = selectedCat ? getDynamicFields(selectedCat.name, selectedCat.id) : []
+
+  // 파일 선택 및 EXIF 실시간 추출 처리 핸들러
+  const handleFileChange = async (selectedFile: File | null) => {
+    setFile(selectedFile)
+    setExifData(null)
+    setExifError(false)
+    
+    if (!selectedFile) return
+
+    const fileExt = selectedFile.name.split('.').pop()?.toLowerCase() || ''
+    const isImage = selectedFile.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp'].includes(fileExt)
+    
+    if (isImage) {
+      setIsExifLoading(true)
+      try {
+        const res = await archiveAPI.parseExif(selectedFile)
+        const data = res.data
+        setExifData(data)
+        
+        // Smart Auto-fill:
+        // 1. 촬영 일시(DateTimeOriginal) 자동 입력
+        if (data.DateTimeOriginal) {
+          const dateVal = formatExifDateToInput(data.DateTimeOriginal)
+          if (dateVal) {
+            setOriginalDate(dateVal)
+          }
+        }
+        
+        // 2. 동적 속성 자동 맵핑 (카테고리가 이미 설정되어 있는 경우)
+        const updatedAttrs = { ...customAttrs }
+        let hasUpdates = false
+        
+        if (data.GPSLatitude && data.GPSLongitude) {
+          const coordsString = `${data.GPSLatitude.toFixed(5)}, ${data.GPSLongitude.toFixed(5)}`
+          const locField = dynamicFields.find((f: any) => 
+            f.key.toLowerCase().includes('location') || 
+            f.key.toLowerCase().includes('place') || 
+            f.key.includes('장소') || 
+            f.key.toLowerCase().includes('gps')
+          )
+          if (locField) {
+            updatedAttrs[locField.key] = coordsString
+            hasUpdates = true
+          } else if (selectedCat && (selectedCat.name.includes('사진') || selectedCat.name.includes('이미지'))) {
+            updatedAttrs['location'] = coordsString
+            hasUpdates = true
+          }
+        }
+        
+        const cameraDevice = [data.Make, data.Model].filter(Boolean).join(' ')
+        if (cameraDevice) {
+          const cameraField = dynamicFields.find((f: any) => 
+            f.key.toLowerCase().includes('camera') || 
+            f.key.toLowerCase().includes('model') || 
+            f.key.includes('기종') || 
+            f.key.includes('기기')
+          )
+          if (cameraField) {
+            updatedAttrs[cameraField.key] = cameraDevice
+            hasUpdates = true
+          }
+        }
+        
+        if (hasUpdates) {
+          setCustomAttrs(updatedAttrs)
+        }
+      } catch (err) {
+        console.error('[EXIF on-the-fly parsing error]', err)
+        setExifError(true)
+      } finally {
+        setIsExifLoading(false)
+      }
+    }
+  }
+
+  // 카테고리 변경 시 동적 필드 초기화 및 기존 EXIF 데이터 스마트 병합
   const handleSelectCategory = (catId: number | '') => {
     setCategoryId(catId)
-    setCustomAttrs({}) // 기존 입력값 청소
     setCatOpen(false)
+
+    // 카테고리에 맞는 빈 필드 생성
+    const newCat = categories.find(c => c.id === catId)
+    const newFields = newCat ? getDynamicFields(newCat.name, newCat.id) : []
+    
+    const nextAttrs: Record<string, string> = {}
+    
+    // 만약 이미 EXIF 정보가 추출된 상태라면, 새로운 카테고리에 어울리는 필드에 스마트 프리필 처리
+    if (exifData) {
+      if (exifData.GPSLatitude && exifData.GPSLongitude) {
+        const coordsString = `${exifData.GPSLatitude.toFixed(5)}, ${exifData.GPSLongitude.toFixed(5)}`
+        const locField = newFields.find((f: any) => 
+          f.key.toLowerCase().includes('location') || 
+          f.key.toLowerCase().includes('place') || 
+          f.key.includes('장소') || 
+          f.key.toLowerCase().includes('gps')
+        )
+        if (locField) {
+          nextAttrs[locField.key] = coordsString
+        } else if (newCat && (newCat.name.includes('사진') || newCat.name.includes('이미지'))) {
+          nextAttrs['location'] = coordsString
+        }
+      }
+      
+      const cameraDevice = [exifData.Make, exifData.Model].filter(Boolean).join(' ')
+      if (cameraDevice) {
+        const cameraField = newFields.find((f: any) => 
+          f.key.toLowerCase().includes('camera') || 
+          f.key.toLowerCase().includes('model') || 
+          f.key.includes('기종') || 
+          f.key.includes('기기')
+        )
+        if (cameraField) {
+          nextAttrs[cameraField.key] = cameraDevice
+        }
+      }
+    }
+    
+    setCustomAttrs(nextAttrs)
   }
 
   // 자료 업로드 핸들러
@@ -70,7 +238,7 @@ export default function DynamicUploadForm({ categories, onUploaded, onClose }: P
       // 빈 문자열 속성은 제외하고 전송
       const cleanCustomAttrs: Record<string, any> = {}
       Object.entries(customAttrs).forEach(([key, val]) => {
-        if (val.trim()) {
+        if (val && val.trim()) {
           cleanCustomAttrs[key] = val.trim()
         }
       })
@@ -97,8 +265,6 @@ export default function DynamicUploadForm({ categories, onUploaded, onClose }: P
 
   const fieldClass = "w-full px-4 py-2.5 rounded-xl museum-input text-sm transition-all focus:border-[var(--umber)] focus:ring-1 focus:ring-[var(--umber)]/20"
   const labelClass = "block text-[11px] font-semibold uppercase tracking-wider text-[var(--taupe)] mb-1.5 flex items-center gap-1.5"
-
-  const dynamicFields = selectedCat ? getDynamicFields(selectedCat.name) : []
 
   return (
     <div
@@ -150,7 +316,7 @@ export default function DynamicUploadForm({ categories, onUploaded, onClose }: P
             <div className="relative group border border-dashed border-[var(--linen)] rounded-xl p-4 hover:bg-[var(--linen)]/20 transition-colors duration-300">
               <input 
                 type="file" 
-                onChange={e => setFile(e.target.files?.[0] || null)}
+                onChange={e => handleFileChange(e.target.files?.[0] || null)}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
               />
               <div className="flex flex-col items-center justify-center text-center space-y-1">
@@ -163,6 +329,13 @@ export default function DynamicUploadForm({ categories, onUploaded, onClose }: P
                 </span>
               </div>
             </div>
+
+            {/* EXIF Metadata Preview Panel */}
+            {(isExifLoading || exifData || exifError) && (
+              <div className="mt-3">
+                <UploadPreview exifData={exifData} isLoading={isExifLoading} hasError={exifError} />
+              </div>
+            )}
           </div>
 
           {/* 2. 카테고리 선택 드롭다운 */}

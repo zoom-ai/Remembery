@@ -54,13 +54,14 @@ def process_archive_ai_background(
         print(f"[AI Background] Processing item {item_id} (Type: Image={is_image}, Video={is_video}, Doc={is_doc})")
 
         # 3. Invoke appropriate AI service
+        custom_attrs = db_item.custom_attributes
         ai_data = {"ai_summary": None, "highlight_quote": None}
         if is_image:
-            ai_data = ai_service.analyze_image(file_path, title, description)
+            ai_data = ai_service.analyze_image(file_path, title, description, custom_attrs, category_name)
         elif is_video:
-            ai_data = ai_service.analyze_video(file_path, title, description)
+            ai_data = ai_service.analyze_video(file_path, title, description, custom_attrs, category_name)
         else:  # Default to document
-            ai_data = ai_service.analyze_document(file_path, title, description)
+            ai_data = ai_service.analyze_document(file_path, title, description, custom_attrs, category_name)
 
         # 4. Update the DB record
         db_item.ai_summary = ai_data.get("ai_summary")
@@ -79,6 +80,12 @@ def process_archive_ai_background(
         if ai_index:
             context_prefix = f"[카테고리: {category_name}] " if category_name else ""
             summary_body = db_item.ai_summary or f"Auto-summary for: {db_item.title}"
+            
+            # Synthesize custom attributes to enrich RAG search context
+            synthesized_str = ai_service.synthesize_custom_attributes(custom_attrs, category_name)
+            if synthesized_str:
+                summary_body = f"{summary_body} {synthesized_str}"
+                
             ai_index.summary = f"{context_prefix}{summary_body}"
             ai_index.is_indexed = True
             db.commit()
@@ -97,6 +104,42 @@ def _item_to_response(item: models.ArchiveItem) -> schemas.ArchiveItemResponse:
     if item.category:
         data.category_name = item.category.name
     return data
+
+# ─────────────────────────────────────────────────────────
+# POST /parse-exif — Parse EXIF metadata from uploaded image
+# ─────────────────────────────────────────────────────────
+@router.post(
+    "/parse-exif",
+    summary="Parse EXIF metadata from an uploaded image",
+    description="Parses and returns EXIF tags (Make, Model, DateTimeOriginal, GPSLatitude, GPSLongitude) from an uploaded image without saving it.",
+)
+def parse_image_exif(
+    file: UploadFile = File(...),
+):
+    file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
+    is_image = (file.content_type and file.content_type.startswith("image/")) or file_ext in [".jpg", ".jpeg", ".png", ".webp"]
+    if not is_image:
+        return {}
+
+    try:
+        temp_name = f"temp_{uuid.uuid4().hex}{file_ext}"
+        temp_path = os.path.join("uploads", temp_name)
+        
+        os.makedirs("uploads", exist_ok=True)
+        with open(temp_path, "wb") as f:
+            f.write(file.file.read())
+            
+        try:
+            from app.utils.exif import extract_image_exif
+            exif_data = extract_image_exif(temp_path)
+            return exif_data
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+    except Exception as e:
+        print(f"[Parse EXIF Route Error] Failed to parse: {e}")
+        return {}
+
 
 # ─────────────────────────────────────────────────────────
 # POST /upload — Upload & register a new archive item
@@ -171,6 +214,19 @@ def upload_archive_item(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid JSON format for custom_attributes: {e}"
             )
+
+    # Automatically extract EXIF metadata for images if custom_attributes is not provided
+    if file and file_path:
+        file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
+        is_image = (file.content_type and file.content_type.startswith("image/")) or file_ext in [".jpg", ".jpeg", ".png", ".webp"]
+        if is_image and not custom_attrs_dict:
+            try:
+                from app.utils.exif import extract_image_exif
+                exif_data = extract_image_exif(file_path)
+                custom_attrs_dict = exif_data
+            except Exception as e:
+                print(f"[EXIF Router Error] Failed during extraction: {e}")
+                custom_attrs_dict = {}
 
     item_schema = schemas.ArchiveItemCreate(
         owner_id=owner_id,
