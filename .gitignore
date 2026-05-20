@@ -28,3 +28,5 @@ backend/*.sqlite3
 .env
 backend/.env
 
+# Local dynamic uploads
+backend/uploads/

@@ -328,7 +328,7 @@ function ArchiveCard({ item, categories, isExpanded, onToggle }: {
     return (
       <article
         onClick={onToggle}
-        className="relative overflow-hidden aspect-[4/3] w-full rounded-2xl border border-[var(--linen)] bg-black/20 group cursor-pointer transition-all duration-500 hover:scale-[1.03] hover:shadow-xl hover:shadow-[var(--umber)]/10 flex flex-col"
+        className="relative overflow-hidden aspect-[4/3] w-full rounded-2xl border border-[var(--linen)] bg-black/20 group cursor-pointer transition-all duration-500 hover:scale-[1.03] hover:shadow-xl hover:shadow-[var(--umber)]/15 flex flex-col"
       >
         {/* Cover image or fallback gradient */}
         {imageUrl ? (
@@ -336,28 +336,28 @@ function ArchiveCard({ item, categories, isExpanded, onToggle }: {
             <img
               src={imageUrl}
               alt={item.title}
-              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
             />
             {/* Dark premium gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-black/20 transition-all duration-500 group-hover:from-black/90 group-hover:via-black/30" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-black/10 transition-all duration-500 group-hover:from-black/90 group-hover:via-black/30" />
           </div>
         ) : (
           <div
             className="absolute inset-0 z-0 bg-gradient-to-br flex items-center justify-center overflow-hidden transition-all duration-500"
             style={{
-              backgroundImage: `linear-gradient(135deg, ${catColor}15 0%, #12100e 100%)`
+              backgroundImage: `linear-gradient(135deg, ${catColor}18 0%, #171412 100%)`
             }}
           >
-            <CatIcon className="w-20 h-20 opacity-[0.04] text-[var(--ivory)] transform rotate-12 transition-transform duration-700 group-hover:scale-110 group-hover:rotate-6" />
+            <CatIcon className="w-20 h-20 opacity-[0.05] text-[var(--ivory)] transform rotate-12 transition-transform duration-700 group-hover:scale-115 group-hover:rotate-6" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
           </div>
         )}
 
         {/* Floating Accent Bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 z-10" style={{ backgroundColor: catColor, opacity: 0.7 }} />
+        <div className="absolute top-0 left-0 right-0 h-[3px] z-10 transition-transform duration-500 group-hover:scale-x-105" style={{ backgroundColor: catColor }} />
 
         {/* Front Content (Title & Badge) */}
-        <div className="absolute inset-0 p-5 z-10 flex flex-col justify-end pointer-events-none">
+        <div className="absolute inset-0 p-5 z-10 flex flex-col justify-end pointer-events-none transition-all duration-500 group-hover:opacity-0 group-hover:translate-y-2">
           <div className="flex items-center justify-between mb-2">
             <span
               className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md backdrop-blur-md border"
@@ -383,39 +383,37 @@ function ArchiveCard({ item, categories, isExpanded, onToggle }: {
         </div>
 
         {/* 🌟 Elegant Hover Overlay (AI Insights & Quotes) 🌟 */}
-        <div className="absolute inset-0 z-20 bg-black/95 backdrop-blur-md p-5 flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-all duration-500 pointer-events-auto">
+        <div className="absolute inset-0 z-20 bg-gradient-to-br from-[#1c1815]/98 to-[#0d0a08]/98 backdrop-blur-md p-5 flex flex-col justify-between opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-500 ease-out pointer-events-auto border border-white/5 rounded-2xl">
           <div className="space-y-3.5">
             <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--umber)] flex items-center gap-1">
-                ✦ AI Docent Insight
+              <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#C5A880] flex items-center gap-1.5 font-display">
+                ✦ AI DOCENT INSIGHT
               </span>
               {item.original_date && (
-                <span className="text-[9px] text-white/40">{formatDate(item.original_date)}</span>
+                <span className="text-[9px] text-white/35 font-medium">{formatDate(item.original_date)}</span>
               )}
             </div>
 
             <div className="space-y-1">
-              <h4 className="text-[9px] font-bold text-white/40 uppercase tracking-widest">분석 요약</h4>
-              <p className="text-[11px] text-[var(--linen)]/90 leading-relaxed font-medium line-clamp-3">
-                {item.ai_summary || item.description || '저장된 미디어를 분석하고 있습니다.'}
+              <h4 className="text-[9px] font-bold text-white/30 uppercase tracking-widest">분석 요약</h4>
+              <p className="text-[11px] text-[var(--parchment)]/90 leading-relaxed font-normal line-clamp-3">
+                {item.ai_summary || item.description || '저장된 기록물을 분석하고 있습니다.'}
               </p>
             </div>
 
             {item.highlight_quote && (
-              <div className="relative mt-2 p-3 bg-white/[0.02] border border-white/5 rounded-xl text-center italic text-[11px] font-serif text-[var(--ivory)] leading-relaxed">
-                <span className="absolute -top-1.5 left-2 text-lg text-[var(--umber)] font-serif leading-none">“</span>
-                <p className="px-3 py-1 font-display text-[var(--linen)]/90 text-center leading-normal">
-                  {item.highlight_quote}
+              <div className="relative mt-2 p-3 bg-white/[0.02] border-l-2 border-[#C5A880]/60 rounded-r-xl">
+                <p className="font-display italic text-[var(--ivory)] text-center text-xs leading-relaxed px-1">
+                  “{item.highlight_quote}”
                 </p>
-                <span className="absolute -bottom-3 right-2 text-lg text-[var(--umber)] font-serif leading-none">”</span>
               </div>
             )}
           </div>
 
           <div className="pt-2 border-t border-white/5 flex items-center justify-between">
             <span className="text-[9px] text-white/30">{formatDate(item.created_at)}</span>
-            <span className="text-[9px] font-bold text-[var(--umber)] tracking-wider flex items-center gap-0.5">
-              자세히 보기 →
+            <span className="text-[9px] font-bold text-[#C5A880] tracking-widest flex items-center gap-1 hover:text-white transition-colors duration-300">
+              상세히 보기 <span className="transform translate-x-0 group-hover:translate-x-1 transition-transform duration-300">→</span>
             </span>
           </div>
         </div>
