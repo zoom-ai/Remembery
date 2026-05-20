@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { archiveAPI, categoryAPI, type ArchiveItem, type Category } from '../services/api'
 import NewCategoryModal from './NewCategoryModal'
-import UploadForm from './UploadForm'
+import DynamicUploadForm from './DynamicUploadForm'
 
 /* ─── Helpers ─────────────────────────────────────────── */
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -260,7 +260,7 @@ export default function ArchiveGrid() {
         />
       )}
       {showUpload && (
-        <UploadForm
+        <DynamicUploadForm
           categories={categories}
           onUploaded={fetchItems}
           onClose={() => setShowUpload(false)}
