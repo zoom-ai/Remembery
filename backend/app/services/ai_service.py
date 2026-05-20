@@ -494,3 +494,155 @@ def suggest_custom_fields_ai(category_name: str) -> List[Dict[str, str]]:
 
     print("[AI Service] Falling back to local category suggestions rules.")
     return fallback_suggestions
+
+
+def parse_resume_text(resume_text: str) -> List[Dict[str, Any]]:
+    """
+    Parses resume/CV plain text via Gemini API and extracts structured timeline
+    events (year, title, description, category) as a JSON array.
+    Falls back to a simple regex-based heuristic if the API is unavailable.
+    """
+    if not resume_text or not resume_text.strip():
+        return []
+
+    # ── 1. Gemini API path ──────────────────────────────────────────────
+    if GEMINI_API_KEY:
+        prompt = (
+            "다음 이력서(Resume/CV) 텍스트에서 학력, 경력, 주요 성취를 추출하여 "
+            "JSON 배열로 반환해 주세요. 각 항목은 다음 키를 포함해야 합니다:\n"
+            "- year (string): 해당 이벤트의 연도 또는 기간 (예: '2015', '2018-2020')\n"
+            "- title (string): 활동 명칭 또는 직함 (예: '삼성전자 소프트웨어 엔지니어')\n"
+            "- description (string): 한국어로 된 상세 설명 (1-2문장)\n"
+            "- category (string): 다음 중 하나 — 'career', 'study', 'project', 'award'\n\n"
+            "다른 설명 텍스트 없이 오직 유효한 JSON 배열만 반환해야 합니다.\n"
+            "연도 순서대로 오래된 것부터 정렬해 주세요.\n\n"
+            f"이력서 텍스트:\n---\n{resume_text[:8000]}\n---"
+        )
+
+        contents = [{"parts": [{"text": prompt}]}]
+
+        try:
+            response_text = _call_gemini_api(contents)
+            if response_text:
+                clean = response_text.strip()
+                if clean.startswith("```json"):
+                    clean = clean[7:]
+                if clean.startswith("```"):
+                    clean = clean[3:]
+                if clean.endswith("```"):
+                    clean = clean[:-3]
+                clean = clean.strip()
+
+                parsed = json.loads(clean)
+                if isinstance(parsed, list):
+                    validated = []
+                    for item in parsed:
+                        if isinstance(item, dict) and "year" in item and "title" in item:
+                            validated.append({
+                                "year": str(item.get("year", "")),
+                                "title": str(item.get("title", "")),
+                                "description": str(item.get("description", "")),
+                                "category": str(item.get("category", "career")),
+                            })
+                    if validated:
+                        print(f"[AI Service] Successfully parsed {len(validated)} resume events from Gemini.")
+                        return validated
+        except Exception as e:
+            print(f"[AI Service ERROR] Resume parsing via Gemini failed: {e}")
+
+    # ── 2. Local regex fallback ─────────────────────────────────────────
+    print("[AI Service] Falling back to local resume parsing heuristic.")
+    events: List[Dict[str, Any]] = []
+    year_pattern = re.compile(r"((?:19|20)\d{2})")
+    for line in resume_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        match = year_pattern.search(line)
+        if match:
+            year = match.group(1)
+            title_text = line.replace(year, "").strip(" -–—:·•|/")
+            if len(title_text) > 3:
+                events.append({
+                    "year": year,
+                    "title": title_text[:120],
+                    "description": "",
+                    "category": "career",
+                })
+    return events
+
+
+def assess_competency(resume_text: str) -> List[Dict[str, Any]]:
+    """
+    Evaluates 5 competency dimensions from resume text and returns numeric
+    scores (0-100) with brief Korean justifications.
+
+    Dimensions:
+      1. 기술력 (Technical Skill)
+      2. 리더십 (Leadership)
+      3. 창의성 (Creativity)
+      4. 커뮤니케이션 (Communication)
+      5. 실행력 (Execution / Drive)
+    """
+    if not resume_text or not resume_text.strip():
+        return _default_competency()
+
+    if GEMINI_API_KEY:
+        prompt = (
+            "다음 이력서(Resume/CV) 텍스트를 분석하여 아래 5가지 역량 지표를 "
+            "0부터 100까지의 점수로 수치화하고 각 지표에 대한 한국어 한 줄 근거를 작성해 주세요.\n\n"
+            "역량 지표:\n"
+            "1. technical_skill (기술력): 전문 기술, 프로그래밍, 도구 활용 능력\n"
+            "2. leadership (리더십): 팀 관리, 의사결정, 조직 이끌기 능력\n"
+            "3. creativity (창의성): 혁신적 사고, 새로운 접근법 제안 능력\n"
+            "4. communication (커뮤니케이션): 발표, 문서 작성, 협업 의사소통 능력\n"
+            "5. execution (실행력): 프로젝트 완수, 목표 달성, 성과 창출 능력\n\n"
+            "반환 형식 — 오직 JSON 배열만:\n"
+            '[{"key": "technical_skill", "label": "기술력", "score": 85, "reason": "근거 한 줄"}]\n\n'
+            f"이력서 텍스트:\n---\n{resume_text[:8000]}\n---"
+        )
+
+        contents = [{"parts": [{"text": prompt}]}]
+
+        try:
+            response_text = _call_gemini_api(contents)
+            if response_text:
+                clean = response_text.strip()
+                if clean.startswith("```json"):
+                    clean = clean[7:]
+                if clean.startswith("```"):
+                    clean = clean[3:]
+                if clean.endswith("```"):
+                    clean = clean[:-3]
+                clean = clean.strip()
+
+                parsed = json.loads(clean)
+                if isinstance(parsed, list):
+                    validated = []
+                    for item in parsed:
+                        if isinstance(item, dict) and "key" in item and "score" in item:
+                            validated.append({
+                                "key": str(item["key"]),
+                                "label": str(item.get("label", item["key"])),
+                                "score": min(100, max(0, int(item["score"]))),
+                                "reason": str(item.get("reason", "")),
+                            })
+                    if validated:
+                        print(f"[AI Service] Competency assessment completed with {len(validated)} dimensions.")
+                        return validated
+        except Exception as e:
+            print(f"[AI Service ERROR] Competency assessment via Gemini failed: {e}")
+
+    print("[AI Service] Falling back to default competency scores.")
+    return _default_competency()
+
+
+def _default_competency() -> List[Dict[str, Any]]:
+    """Returns neutral default competency scores when AI is unavailable."""
+    return [
+        {"key": "technical_skill", "label": "기술력", "score": 50, "reason": "이력서 기반 자동 분석이 불가하여 기본값을 적용합니다."},
+        {"key": "leadership", "label": "리더십", "score": 50, "reason": "이력서 기반 자동 분석이 불가하여 기본값을 적용합니다."},
+        {"key": "creativity", "label": "창의성", "score": 50, "reason": "이력서 기반 자동 분석이 불가하여 기본값을 적용합니다."},
+        {"key": "communication", "label": "커뮤니케이션", "score": 50, "reason": "이력서 기반 자동 분석이 불가하여 기본값을 적용합니다."},
+        {"key": "execution", "label": "실행력", "score": 50, "reason": "이력서 기반 자동 분석이 불가하여 기본값을 적용합니다."},
+    ]

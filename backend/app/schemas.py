@@ -318,3 +318,45 @@ class MemoryResponse(MemoryBase):
 
     class Config:
         from_attributes = True
+
+
+# ─────────────────────────────────────────────────────────
+# Resume / CV Parsing Schemas
+# ─────────────────────────────────────────────────────────
+class ResumeParseRequest(BaseModel):
+    """Request body for POST /api/resume/parse"""
+    resume_text: str = Field(
+        ...,
+        min_length=10,
+        max_length=30000,
+        description="Plain-text content of the resume / CV to analyze."
+    )
+    include_competency: bool = Field(
+        default=False,
+        description="If true, additionally returns a 5-axis competency assessment."
+    )
+
+class ResumeTimelineEvent(BaseModel):
+    """A single timeline event extracted from a resume."""
+    year: str = Field(..., description="Year or period (e.g. '2015' or '2018-2020')")
+    title: str = Field(..., description="Activity name or job title")
+    description: str = Field(default="", description="Detailed description (1-2 sentences, Korean)")
+    category: str = Field(default="career", description="One of: career, study, project, award")
+
+class ResumeCompetency(BaseModel):
+    """A single competency dimension score."""
+    key: str = Field(..., description="Competency key (e.g. 'technical_skill')")
+    label: str = Field(..., description="Korean display label (e.g. '기술력')")
+    score: int = Field(..., ge=0, le=100, description="Score from 0 to 100")
+    reason: str = Field(default="", description="One-line Korean justification")
+
+class ResumeParseResponse(BaseModel):
+    """Response body for POST /api/resume/parse"""
+    timeline_events: List[ResumeTimelineEvent] = Field(
+        default_factory=list,
+        description="Extracted career/education/project events for timeline creation."
+    )
+    competency: Optional[List[ResumeCompetency]] = Field(
+        default=None,
+        description="5-axis competency assessment (only when include_competency=true)."
+    )

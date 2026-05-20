@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app import models
 from app.database import engine
-from app.routers import memories, archive, ai, exhibition, category, users
+from app.routers import memories, archive, ai, exhibition, category, users, resume
 
 # Create uploads directory if it doesn't exist
 os.makedirs("uploads", exist_ok=True)
@@ -51,6 +51,7 @@ app.include_router(exhibition.router, prefix="/api")
 app.include_router(category.router, prefix="/api")
 app.include_router(memories.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(resume.router, prefix="/api")
 
 @app.get("/")
 def read_root():
