@@ -62,9 +62,9 @@ Converses with visitors in your own legacy tone and manner. Powered by the **Gem
 ```mermaid
 graph TD
     A[User Uploads Image / Document] --> B[FastAPI Backend EXIF Extractor]
-    B -->|Parse GPS & DateTime| C[Fill DB Schema with custom_attributes]
+    B -->|Parse GPS & DateTime| C["Fill DB Schema with custom_attributes"]
     C --> D[Vector DB Indexing]
-    D -->|String Synthesis| E[Prompt: 'This item was captured in [location] with [camera] on [date]']
+    D -->|String Synthesis| E["Prompt: 'This item was captured in [location] with [camera] on [date]'"]
     E --> F[Gemini RAG Engine]
     F -->|Conversational Legacy Response| G[AI Docent Chat Panel]
 ```

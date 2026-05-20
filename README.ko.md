@@ -62,9 +62,9 @@ Remembery는 우아한 프론트엔드 UI/UX와 백엔드의 고도화된 AI 파
 ```mermaid
 graph TD
     A[사용자 사진 / 문서 업로드] --> B[FastAPI 백엔드 EXIF 추출기]
-    B -->|GPS & 촬영일시 파싱| C[custom_attributes DB 필드 기록]
+    B -->|GPS & 촬영일시 파싱| C["custom_attributes DB 필드 기록"]
     C --> D[벡터 DB 인덱싱]
-    D -->|문자열 합성 및 프리필| E[프롬프트: '이 자료는 [촬영지]에서 [기종]으로 [날짜]에 촬영됨']
+    D -->|문자열 합성 및 프리필| E["프롬프트: '이 자료는 [촬영지]에서 [기종]으로 [날짜]에 촬영됨'"]
     E --> F[Gemini RAG 추론 엔진]
     F -->|사용자 고유 톤앤매너 답변| G[AI 도슨트 대화 화면]
 ```
