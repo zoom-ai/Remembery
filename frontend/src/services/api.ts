@@ -314,9 +314,25 @@ export interface BatchArchiveResponse {
   message: string
 }
 
+export interface ExtractTextResponse {
+  extracted_text: string
+  filename: string
+  file_size: number
+  char_count: number
+}
+
 export const resumeAPI = {
   parse: (data: { resume_text: string; include_competency: boolean }) =>
     API.post<ResumeParseResponse>('/resume/parse', data),
+
+  extractText: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return API.post<ExtractTextResponse>('/resume/extract-text', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000,
+    })
+  },
 }
 
 export default API

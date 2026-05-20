@@ -1,10 +1,24 @@
 /**
  * ResumeImporter — AI 이력서 분석 및 타임라인 자동 생성 컴포넌트
- * 
+ *
+ * 듀얼 입력: 텍스트 붙여넣기 OR PDF/DOCX/TXT 파일 업로드
  * 3-state flow: Input → Loading → Preview/Edit
  */
-import { useState } from 'react'
-import { FileText, Sparkles, Loader2, Trash2, Save, RotateCcw, BarChart3, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react'
+import {
+  FileText,
+  Sparkles,
+  Loader2,
+  Trash2,
+  Save,
+  RotateCcw,
+  BarChart3,
+  CheckCircle2,
+  AlertCircle,
+  Upload,
+  FileUp,
+  X,
+} from 'lucide-react'
 import { resumeAPI, archiveAPI } from '../services/api'
 
 interface ResumeEvent {
@@ -25,14 +39,28 @@ interface Props {
   onImported: () => void
 }
 
+type InputMode = 'text' | 'file'
+
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  career:  { bg: 'bg-blue-50',   text: 'text-blue-700',   label: '경력' },
+  career:  { bg: 'bg-blue-50',    text: 'text-blue-700',    label: '경력' },
   study:   { bg: 'bg-emerald-50', text: 'text-emerald-700', label: '학력' },
-  project: { bg: 'bg-amber-50',  text: 'text-amber-700',  label: '프로젝트' },
-  award:   { bg: 'bg-rose-50',   text: 'text-rose-700',   label: '수상' },
+  project: { bg: 'bg-amber-50',   text: 'text-amber-700',   label: '프로젝트' },
+  award:   { bg: 'bg-rose-50',    text: 'text-rose-700',    label: '수상' },
 }
 
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.md', '.rtf']
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'text/plain',
+  'text/markdown',
+  'application/rtf',
+]
+
 export default function ResumeImporter({ onImported }: Props) {
+  /* ── State ─────────────────────────────────────── */
+  const [inputMode, setInputMode] = useState<InputMode>('text')
   const [resumeText, setResumeText] = useState('')
   const [includeCompetency, setIncludeCompetency] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -42,6 +70,73 @@ export default function ResumeImporter({ onImported }: Props) {
   const [showResult, setShowResult] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [error, setError] = useState('')
+
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isExtracting, setIsExtracting] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  /* ── File validation ───────────────────────────── */
+  const validateFile = (file: File): string | null => {
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+    if (!ALLOWED_EXTENSIONS.includes(ext) && !ALLOWED_MIME_TYPES.includes(file.type)) {
+      return `지원되지 않는 파일 형식입니다. PDF, DOCX, TXT 파일만 업로드할 수 있습니다.`
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return '파일 크기가 10MB를 초과합니다.'
+    }
+    return null
+  }
+
+  /* ── File selection handler ────────────────────── */
+  const handleFileSelect = (file: File) => {
+    const err = validateFile(file)
+    if (err) {
+      setError(err)
+      return
+    }
+    setError('')
+    setSelectedFile(file)
+  }
+
+  /* ── File upload & text extraction ─────────────── */
+  const handleExtractText = async () => {
+    if (!selectedFile) return
+    setIsExtracting(true)
+    setError('')
+
+    try {
+      const res = await resumeAPI.extractText(selectedFile)
+      setResumeText(res.data.extracted_text)
+      setInputMode('text') // Switch to text view so user can review/edit
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || '파일에서 텍스트를 추출하지 못했습니다.')
+    } finally {
+      setIsExtracting(false)
+    }
+  }
+
+  /* ── Drag & Drop handlers ──────────────────────── */
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFileSelect(file)
+  }, [])
 
   /* ── AI 분석 요청 ────────────────────────────── */
   const handleAnalyze = async () => {
@@ -106,7 +201,22 @@ export default function ResumeImporter({ onImported }: Props) {
     setEvents([])
     setCompetency(null)
     setSaveSuccess(false)
+    setSelectedFile(null)
     setError('')
+  }
+
+  /* ── Format file size ──────────────────────── */
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const getFileIcon = (name: string) => {
+    const ext = name.split('.').pop()?.toLowerCase()
+    if (ext === 'pdf') return '📄'
+    if (ext === 'docx' || ext === 'doc') return '📝'
+    return '📃'
   }
 
   /* ═══════════════════════════════════════════════
@@ -303,7 +413,7 @@ export default function ResumeImporter({ onImported }: Props) {
   }
 
   /* ═══════════════════════════════════════════════
-     RENDER: Input State (Default)
+     RENDER: Input State (Default) — Dual Mode
      ═══════════════════════════════════════════════ */
   return (
     <div className="max-w-3xl mx-auto space-y-8 transition-all duration-500">
@@ -316,7 +426,7 @@ export default function ResumeImporter({ onImported }: Props) {
           이력서로 타임라인 만들기
         </h1>
         <p className="text-[var(--graphite)] text-sm max-w-lg mx-auto leading-relaxed">
-          이력서 텍스트를 붙여넣으면, AI가 학력·경력·프로젝트·수상 항목을 자동으로 추출하여
+          이력서를 붙여넣거나 파일로 업로드하면, AI가 학력·경력·프로젝트·수상 항목을 자동으로 추출하여
           당신의 인생 타임라인으로 변환해 드립니다.
         </p>
       </div>
@@ -325,57 +435,255 @@ export default function ResumeImporter({ onImported }: Props) {
       {error && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
           <AlertCircle className="w-5 h-5 shrink-0" />
-          {error}
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError('')} className="p-1 hover:bg-rose-100 rounded-lg transition-colors">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      {/* Textarea */}
-      <div className="museum-card rounded-2xl p-6 space-y-5">
-        <textarea
-          value={resumeText}
-          onChange={(e) => setResumeText(e.target.value)}
-          rows={12}
-          className="w-full px-4 py-3 rounded-xl bg-[var(--parchment)] border border-[var(--linen)]
-                     text-sm text-[var(--charcoal)] font-mono leading-relaxed resize-none
-                     placeholder:text-[var(--taupe)] focus:outline-none focus:ring-2
-                     focus:ring-[var(--umber)]/30 transition-all"
-          placeholder={`이력서 텍스트를 여기에 붙여넣으세요...\n\n예시:\n2015  서울대학교 컴퓨터공학과 졸업\n2016-2020  삼성전자 소프트웨어 엔지니어\n2020  우수 사원상 수상\n2021-현재  Google DeepMind 연구원`}
-        />
-
-        {/* Options Row */}
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2.5 cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={includeCompetency}
-              onChange={(e) => setIncludeCompetency(e.target.checked)}
-              className="w-4 h-4 rounded border-[var(--taupe)] text-[var(--museum)]
-                         focus:ring-[var(--umber)]/30 transition-all"
-            />
-            <span className="flex items-center gap-1.5 text-sm text-[var(--graphite)] group-hover:text-[var(--charcoal)] transition-colors">
-              <BarChart3 className="w-4 h-4" />
-              역량 분석 포함
-            </span>
-          </label>
-
-          <span className="text-xs text-[var(--taupe)]">
-            {resumeText.length.toLocaleString()} / 30,000자
-          </span>
-        </div>
-
-        {/* Submit Button */}
+      {/* ── Input Mode Toggle ────────────────────── */}
+      <div className="flex rounded-xl bg-[var(--linen)] p-1 gap-1">
         <button
-          onClick={handleAnalyze}
-          disabled={!resumeText.trim() || resumeText.trim().length < 10}
-          className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl
-                     bg-[var(--museum)] text-[var(--ivory)] text-sm font-medium
-                     hover:bg-[var(--charcoal)] transition-all active:scale-[0.98]
-                     disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+          onClick={() => setInputMode('text')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
+            ${inputMode === 'text'
+              ? 'bg-[var(--ivory)] text-[var(--charcoal)] shadow-sm'
+              : 'text-[var(--taupe)] hover:text-[var(--graphite)]'
+            }`}
         >
-          <Sparkles className="w-4 h-4" />
-          AI로 분석하기
+          <FileText className="w-4 h-4" />
+          텍스트 붙여넣기
+        </button>
+        <button
+          onClick={() => setInputMode('file')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all
+            ${inputMode === 'file'
+              ? 'bg-[var(--ivory)] text-[var(--charcoal)] shadow-sm'
+              : 'text-[var(--taupe)] hover:text-[var(--graphite)]'
+            }`}
+        >
+          <Upload className="w-4 h-4" />
+          파일 업로드
         </button>
       </div>
+
+      {/* ── Input Card ───────────────────────────── */}
+      <div className="museum-card rounded-2xl p-6 space-y-5">
+
+        {/* === Text Mode === */}
+        {inputMode === 'text' && (
+          <>
+            <textarea
+              value={resumeText}
+              onChange={(e) => setResumeText(e.target.value)}
+              rows={12}
+              className="w-full px-4 py-3 rounded-xl bg-[var(--parchment)] border border-[var(--linen)]
+                         text-sm text-[var(--charcoal)] font-mono leading-relaxed resize-none
+                         placeholder:text-[var(--taupe)] focus:outline-none focus:ring-2
+                         focus:ring-[var(--umber)]/30 transition-all"
+              placeholder={`이력서 텍스트를 여기에 붙여넣으세요...\n\n예시:\n2015  서울대학교 컴퓨터공학과 졸업\n2016-2020  삼성전자 소프트웨어 엔지니어\n2020  우수 사원상 수상\n2021-현재  Google DeepMind 연구원`}
+            />
+
+            {/* Options Row */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={includeCompetency}
+                  onChange={(e) => setIncludeCompetency(e.target.checked)}
+                  className="w-4 h-4 rounded border-[var(--taupe)] text-[var(--museum)]
+                             focus:ring-[var(--umber)]/30 transition-all"
+                />
+                <span className="flex items-center gap-1.5 text-sm text-[var(--graphite)] group-hover:text-[var(--charcoal)] transition-colors">
+                  <BarChart3 className="w-4 h-4" />
+                  역량 분석 포함
+                </span>
+              </label>
+              <span className="text-xs text-[var(--taupe)]">
+                {resumeText.length.toLocaleString()} / 30,000자
+              </span>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              onClick={handleAnalyze}
+              disabled={!resumeText.trim() || resumeText.trim().length < 10}
+              className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl
+                         bg-[var(--museum)] text-[var(--ivory)] text-sm font-medium
+                         hover:bg-[var(--charcoal)] transition-all active:scale-[0.98]
+                         disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            >
+              <Sparkles className="w-4 h-4" />
+              AI로 분석하기
+            </button>
+          </>
+        )}
+
+        {/* === File Mode === */}
+        {inputMode === 'file' && (
+          <>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.doc,.txt,.md,.rtf"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleFileSelect(file)
+              }}
+            />
+
+            {/* Drop Zone */}
+            {!selectedFile ? (
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`flex flex-col items-center justify-center gap-4 py-16 rounded-xl border-2 border-dashed
+                  cursor-pointer transition-all duration-300
+                  ${isDragOver
+                    ? 'border-[var(--umber)] bg-[var(--umber)]/5 scale-[1.01]'
+                    : 'border-[var(--taupe)]/30 bg-[var(--parchment)] hover:border-[var(--taupe)]/50 hover:bg-[var(--linen)]/50'
+                  }`}
+              >
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300
+                  ${isDragOver ? 'bg-[var(--umber)]/10' : 'bg-[var(--linen)]'}`}
+                >
+                  <FileUp className={`w-7 h-7 transition-all duration-300
+                    ${isDragOver ? 'text-[var(--umber)] scale-110' : 'text-[var(--taupe)]'}`}
+                  />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-medium text-[var(--charcoal)]">
+                    {isDragOver ? '여기에 놓으세요!' : '파일을 드래그하거나 클릭하여 업로드'}
+                  </p>
+                  <p className="text-xs text-[var(--taupe)]">
+                    PDF, DOCX, TXT 지원 · 최대 10MB
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* Selected File Preview */
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--parchment)] border border-[var(--linen)]">
+                  <div className="w-12 h-12 rounded-xl bg-[var(--linen)] flex items-center justify-center text-2xl">
+                    {getFileIcon(selectedFile.name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[var(--charcoal)] truncate">
+                      {selectedFile.name}
+                    </p>
+                    <p className="text-xs text-[var(--taupe)]">
+                      {formatFileSize(selectedFile.size)} · {selectedFile.name.split('.').pop()?.toUpperCase()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedFile(null)
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                    className="p-2 rounded-lg text-[var(--taupe)] hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                    title="파일 제거"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Extracting indicator */}
+                {isExtracting && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--linen)]">
+                    <Loader2 className="w-4 h-4 text-[var(--umber)] animate-spin" />
+                    <span className="text-sm text-[var(--graphite)] animate-pulse">
+                      파일에서 텍스트를 추출하고 있습니다…
+                    </span>
+                  </div>
+                )}
+
+                {/* Competency checkbox */}
+                <label className="flex items-center gap-2.5 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={includeCompetency}
+                    onChange={(e) => setIncludeCompetency(e.target.checked)}
+                    className="w-4 h-4 rounded border-[var(--taupe)] text-[var(--museum)]
+                               focus:ring-[var(--umber)]/30 transition-all"
+                  />
+                  <span className="flex items-center gap-1.5 text-sm text-[var(--graphite)] group-hover:text-[var(--charcoal)] transition-colors">
+                    <BarChart3 className="w-4 h-4" />
+                    역량 분석 포함
+                  </span>
+                </label>
+
+                {/* Action buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleExtractText}
+                    disabled={isExtracting}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
+                               border border-[var(--taupe)] text-sm font-medium text-[var(--graphite)]
+                               hover:bg-[var(--linen)] transition-all active:scale-[0.98]
+                               disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isExtracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                    텍스트 추출 후 검토
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!selectedFile) return
+                      setIsExtracting(true)
+                      setError('')
+                      try {
+                        const res = await resumeAPI.extractText(selectedFile)
+                        setResumeText(res.data.extracted_text)
+                        // Auto-analyze immediately
+                        setIsExtracting(false)
+                        setIsAnalyzing(true)
+                        try {
+                          const parsed = await resumeAPI.parse({
+                            resume_text: res.data.extracted_text,
+                            include_competency: includeCompetency,
+                          })
+                          setEvents(parsed.data.timeline_events)
+                          setCompetency(parsed.data.competency)
+                          setShowResult(true)
+                        } catch (err: any) {
+                          setError(err?.response?.data?.detail || '이력서 분석 중 오류가 발생했습니다.')
+                        } finally {
+                          setIsAnalyzing(false)
+                        }
+                      } catch (err: any) {
+                        setError(err?.response?.data?.detail || '파일에서 텍스트를 추출하지 못했습니다.')
+                        setIsExtracting(false)
+                      }
+                    }}
+                    disabled={isExtracting}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
+                               bg-[var(--museum)] text-[var(--ivory)] text-sm font-medium
+                               hover:bg-[var(--charcoal)] transition-all active:scale-[0.98]
+                               disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    {isExtracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    바로 AI 분석하기
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Info about text mode after file extraction ── */}
+      {inputMode === 'text' && resumeText && selectedFile && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>
+            <strong>{selectedFile.name}</strong>에서 텍스트가 추출되었습니다. 내용을 확인한 뒤 분석을 시작하세요.
+          </span>
+        </div>
+      )}
     </div>
   )
 }
