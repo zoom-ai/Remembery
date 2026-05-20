@@ -323,7 +323,9 @@ export interface ExtractTextResponse {
 
 export const resumeAPI = {
   parse: (data: { resume_text: string; include_competency: boolean }) =>
-    API.post<ResumeParseResponse>('/resume/parse', data),
+    API.post<ResumeParseResponse>('/resume/parse', data, {
+      timeout: 60000,  // Gemini AI calls can take 30-60s
+    }),
 
   extractText: (file: File) => {
     const formData = new FormData()

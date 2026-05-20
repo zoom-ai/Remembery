@@ -18,6 +18,7 @@ import {
   Upload,
   FileUp,
   X,
+  Inbox,
 } from 'lucide-react'
 import { resumeAPI, archiveAPI } from '../services/api'
 
@@ -49,14 +50,6 @@ const CATEGORY_STYLES: Record<string, { bg: string; text: string; label: string 
 }
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.md', '.rtf']
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/msword',
-  'text/plain',
-  'text/markdown',
-  'application/rtf',
-]
 
 export default function ResumeImporter({ onImported }: Props) {
   /* ── State ─────────────────────────────────────── */
@@ -79,18 +72,21 @@ export default function ResumeImporter({ onImported }: Props) {
 
   /* ── File validation ───────────────────────────── */
   const validateFile = (file: File): string | null => {
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
-    if (!ALLOWED_EXTENSIONS.includes(ext) && !ALLOWED_MIME_TYPES.includes(file.type)) {
+    const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '')
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return `지원되지 않는 파일 형식입니다. PDF, DOCX, TXT 파일만 업로드할 수 있습니다.`
     }
     if (file.size > 10 * 1024 * 1024) {
       return '파일 크기가 10MB를 초과합니다.'
     }
+    if (file.size === 0) {
+      return '빈 파일입니다. 내용이 있는 파일을 업로드해 주세요.'
+    }
     return null
   }
 
   /* ── File selection handler ────────────────────── */
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = useCallback((file: File) => {
     const err = validateFile(file)
     if (err) {
       setError(err)
@@ -98,7 +94,7 @@ export default function ResumeImporter({ onImported }: Props) {
     }
     setError('')
     setSelectedFile(file)
-  }
+  }, [])
 
   /* ── File upload & text extraction ─────────────── */
   const handleExtractText = async () => {
@@ -108,11 +104,63 @@ export default function ResumeImporter({ onImported }: Props) {
 
     try {
       const res = await resumeAPI.extractText(selectedFile)
-      setResumeText(res.data.extracted_text)
-      setInputMode('text') // Switch to text view so user can review/edit
+      const text = res.data.extracted_text
+      if (!text || text.trim().length < 10) {
+        setError('파일에서 충분한 텍스트를 추출하지 못했습니다. 텍스트가 포함된 파일인지 확인해 주세요.')
+        setIsExtracting(false)
+        return
+      }
+      setResumeText(text)
+      setInputMode('text')
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '파일에서 텍스트를 추출하지 못했습니다.')
+      const detail = err?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : '파일에서 텍스트를 추출하지 못했습니다. 다른 파일을 시도해 주세요.')
     } finally {
+      setIsExtracting(false)
+    }
+  }
+
+  /* ── File upload & direct analyze ──────────────── */
+  const handleFileDirectAnalyze = async () => {
+    if (!selectedFile) return
+    setIsExtracting(true)
+    setError('')
+
+    try {
+      // Step 1: Extract text
+      const extractRes = await resumeAPI.extractText(selectedFile)
+      const text = extractRes.data.extracted_text
+
+      if (!text || text.trim().length < 10) {
+        setError('파일에서 충분한 텍스트를 추출하지 못했습니다. 이미지 기반 PDF(스캔)는 지원되지 않습니다. 텍스트가 포함된 파일을 업로드해 주세요.')
+        setIsExtracting(false)
+        return
+      }
+
+      setResumeText(text)
+      setIsExtracting(false)
+
+      // Step 2: Analyze with AI
+      setIsAnalyzing(true)
+      try {
+        const parsed = await resumeAPI.parse({
+          resume_text: text,
+          include_competency: includeCompetency,
+        })
+
+        const timelineEvents = parsed.data.timeline_events || []
+        setEvents(timelineEvents)
+        setCompetency(parsed.data.competency || null)
+        setShowResult(true)
+      } catch (err: any) {
+        const detail = err?.response?.data?.detail
+        setError(typeof detail === 'string' ? detail : '이력서 분석 중 오류가 발생했습니다. 다시 시도해 주세요.')
+      } finally {
+        setIsAnalyzing(false)
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : '파일에서 텍스트를 추출하지 못했습니다. 다른 파일을 시도해 주세요.')
       setIsExtracting(false)
     }
   }
@@ -136,11 +184,11 @@ export default function ResumeImporter({ onImported }: Props) {
     setIsDragOver(false)
     const file = e.dataTransfer.files?.[0]
     if (file) handleFileSelect(file)
-  }, [])
+  }, [handleFileSelect])
 
-  /* ── AI 분석 요청 ────────────────────────────── */
+  /* ── AI 분석 요청 (텍스트 모드) ─────────────────── */
   const handleAnalyze = async () => {
-    if (!resumeText.trim()) return
+    if (!resumeText.trim() || resumeText.trim().length < 10) return
     setError('')
     setIsAnalyzing(true)
     setSaveSuccess(false)
@@ -150,11 +198,13 @@ export default function ResumeImporter({ onImported }: Props) {
         resume_text: resumeText,
         include_competency: includeCompetency,
       })
-      setEvents(res.data.timeline_events)
-      setCompetency(res.data.competency)
+      const timelineEvents = res.data.timeline_events || []
+      setEvents(timelineEvents)
+      setCompetency(res.data.competency || null)
       setShowResult(true)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '이력서 분석 중 오류가 발생했습니다. 다시 시도해 주세요.')
+      const detail = err?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : '이력서 분석 중 오류가 발생했습니다. 다시 시도해 주세요.')
     } finally {
       setIsAnalyzing(false)
     }
@@ -181,7 +231,8 @@ export default function ResumeImporter({ onImported }: Props) {
       setSaveSuccess(true)
       setTimeout(() => onImported(), 1800)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '저장 중 오류가 발생했습니다.')
+      const detail = err?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : '저장 중 오류가 발생했습니다.')
     } finally {
       setIsSaving(false)
     }
@@ -203,6 +254,8 @@ export default function ResumeImporter({ onImported }: Props) {
     setSaveSuccess(false)
     setSelectedFile(null)
     setError('')
+    setIsAnalyzing(false)
+    setIsExtracting(false)
   }
 
   /* ── Format file size ──────────────────────── */
@@ -264,7 +317,7 @@ export default function ResumeImporter({ onImported }: Props) {
         {error && (
           <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            {error}
+            <span className="flex-1">{error}</span>
           </div>
         )}
 
@@ -309,83 +362,110 @@ export default function ResumeImporter({ onImported }: Props) {
           </div>
         )}
 
+        {/* ── Empty State (no events found) ──────── */}
+        {events.length === 0 && (
+          <div className="museum-card rounded-2xl p-10 text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--linen)] mb-2">
+              <Inbox className="w-8 h-8 text-[var(--taupe)]" />
+            </div>
+            <h3 className="font-display text-xl font-semibold text-[var(--charcoal)]">
+              추출된 항목이 없습니다
+            </h3>
+            <p className="text-sm text-[var(--graphite)] max-w-md mx-auto leading-relaxed">
+              AI가 이력서에서 타임라인 항목을 찾지 못했습니다.
+              이력서에 연도, 직함/학교명, 활동 내용이 포함되어 있는지 확인해 주세요.
+              이미지 기반 PDF(스캔)의 경우 텍스트를 인식하지 못할 수 있습니다.
+            </p>
+            <button
+              onClick={resetAll}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl
+                         bg-[var(--museum)] text-[var(--ivory)] text-sm font-medium
+                         hover:bg-[var(--charcoal)] transition-all active:scale-95 mt-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              다시 시도하기
+            </button>
+          </div>
+        )}
+
         {/* ── Event Cards ────────────────────────── */}
-        <div className="space-y-4">
-          {events.map((ev, idx) => {
-            const style = CATEGORY_STYLES[ev.category] || CATEGORY_STYLES.career
-            return (
-              <div
-                key={idx}
-                className="museum-card rounded-2xl p-5 space-y-3 transition-all duration-300"
-                style={{ animationDelay: `${idx * 60}ms` }}
-              >
-                {/* Top row: badge + delete */}
-                <div className="flex items-center justify-between">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
-                    {style.label}
-                  </span>
-                  <button
-                    onClick={() => deleteEvent(idx)}
-                    className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                    title="삭제"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Year + Title row */}
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    value={ev.year}
-                    onChange={(e) => updateEvent(idx, 'year', e.target.value)}
-                    className="w-28 px-3 py-2 text-center rounded-lg bg-[var(--parchment)] border border-[var(--linen)]
-                               text-sm font-semibold text-[var(--charcoal)] focus:outline-none focus:ring-2
-                               focus:ring-[var(--umber)]/30 transition-all"
-                    placeholder="연도"
-                  />
-                  <input
-                    type="text"
-                    value={ev.title}
-                    onChange={(e) => updateEvent(idx, 'title', e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-lg bg-[var(--parchment)] border border-[var(--linen)]
-                               text-sm font-semibold text-[var(--charcoal)] focus:outline-none focus:ring-2
-                               focus:ring-[var(--umber)]/30 transition-all"
-                    placeholder="활동 명칭"
-                  />
-                </div>
-
-                {/* Description */}
-                <textarea
-                  value={ev.description}
-                  onChange={(e) => updateEvent(idx, 'description', e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 rounded-lg bg-[var(--parchment)] border border-[var(--linen)]
-                             text-sm text-[var(--graphite)] resize-none focus:outline-none focus:ring-2
-                             focus:ring-[var(--umber)]/30 transition-all"
-                  placeholder="상세 설명을 입력하거나 수정하세요..."
-                />
-
-                {/* Category selector */}
-                <div className="flex gap-2">
-                  {Object.entries(CATEGORY_STYLES).map(([key, s]) => (
+        {events.length > 0 && (
+          <div className="space-y-4">
+            {events.map((ev, idx) => {
+              const style = CATEGORY_STYLES[ev.category] || CATEGORY_STYLES.career
+              return (
+                <div
+                  key={idx}
+                  className="museum-card rounded-2xl p-5 space-y-3 transition-all duration-300"
+                >
+                  {/* Top row: badge + delete */}
+                  <div className="flex items-center justify-between">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
+                      {style.label}
+                    </span>
                     <button
-                      key={key}
-                      onClick={() => updateEvent(idx, 'category', key)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all
-                        ${ev.category === key
-                          ? `${s.bg} ${s.text} ring-2 ring-offset-1 ring-current`
-                          : 'bg-[var(--linen)] text-[var(--taupe)] hover:bg-[var(--parchment)]'
-                        }`}
+                      onClick={() => deleteEvent(idx)}
+                      className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      title="삭제"
                     >
-                      {s.label}
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                  ))}
+                  </div>
+
+                  {/* Year + Title row */}
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={ev.year}
+                      onChange={(e) => updateEvent(idx, 'year', e.target.value)}
+                      className="w-28 px-3 py-2 text-center rounded-lg bg-[var(--parchment)] border border-[var(--linen)]
+                                 text-sm font-semibold text-[var(--charcoal)] focus:outline-none focus:ring-2
+                                 focus:ring-[var(--umber)]/30 transition-all"
+                      placeholder="연도"
+                    />
+                    <input
+                      type="text"
+                      value={ev.title}
+                      onChange={(e) => updateEvent(idx, 'title', e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-lg bg-[var(--parchment)] border border-[var(--linen)]
+                                 text-sm font-semibold text-[var(--charcoal)] focus:outline-none focus:ring-2
+                                 focus:ring-[var(--umber)]/30 transition-all"
+                      placeholder="활동 명칭"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <textarea
+                    value={ev.description}
+                    onChange={(e) => updateEvent(idx, 'description', e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--parchment)] border border-[var(--linen)]
+                               text-sm text-[var(--graphite)] resize-none focus:outline-none focus:ring-2
+                               focus:ring-[var(--umber)]/30 transition-all"
+                    placeholder="상세 설명을 입력하거나 수정하세요..."
+                  />
+
+                  {/* Category selector */}
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.entries(CATEGORY_STYLES).map(([key, s]) => (
+                      <button
+                        key={key}
+                        onClick={() => updateEvent(idx, 'category', key)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all
+                          ${ev.category === key
+                            ? `${s.bg} ${s.text} ring-2 ring-offset-1 ring-current`
+                            : 'bg-[var(--linen)] text-[var(--taupe)] hover:bg-[var(--parchment)]'
+                          }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* ── Action Bar ─────────────────────────── */}
         <div className="flex items-center justify-between pt-4 border-t border-[var(--linen)]">
@@ -397,16 +477,18 @@ export default function ResumeImporter({ onImported }: Props) {
             <RotateCcw className="w-4 h-4" />
             다시 분석하기
           </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving || events.length === 0}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--museum)] text-[var(--ivory)]
-                       text-sm font-medium hover:bg-[var(--charcoal)] transition-all active:scale-95
-                       disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            이대로 내 라이브러리에 저장
-          </button>
+          {events.length > 0 && (
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[var(--museum)] text-[var(--ivory)]
+                         text-sm font-medium hover:bg-[var(--charcoal)] transition-all active:scale-95
+                         disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              이대로 내 라이브러리에 저장
+            </button>
+          )}
         </div>
       </div>
     )
@@ -532,6 +614,8 @@ export default function ResumeImporter({ onImported }: Props) {
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) handleFileSelect(file)
+                // Reset input so same file can be re-selected
+                if (fileInputRef.current) fileInputRef.current.value = ''
               }}
             />
 
@@ -569,7 +653,7 @@ export default function ResumeImporter({ onImported }: Props) {
               /* Selected File Preview */
               <div className="space-y-4">
                 <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--parchment)] border border-[var(--linen)]">
-                  <div className="w-12 h-12 rounded-xl bg-[var(--linen)] flex items-center justify-center text-2xl">
+                  <div className="w-12 h-12 rounded-xl bg-[var(--linen)] flex items-center justify-center text-2xl shrink-0">
                     {getFileIcon(selectedFile.name)}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -583,9 +667,9 @@ export default function ResumeImporter({ onImported }: Props) {
                   <button
                     onClick={() => {
                       setSelectedFile(null)
-                      if (fileInputRef.current) fileInputRef.current.value = ''
+                      setError('')
                     }}
-                    className="p-2 rounded-lg text-[var(--taupe)] hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                    className="p-2 rounded-lg text-[var(--taupe)] hover:text-rose-500 hover:bg-rose-50 transition-colors shrink-0"
                     title="파일 제거"
                   >
                     <X className="w-4 h-4" />
@@ -631,34 +715,7 @@ export default function ResumeImporter({ onImported }: Props) {
                     텍스트 추출 후 검토
                   </button>
                   <button
-                    onClick={async () => {
-                      if (!selectedFile) return
-                      setIsExtracting(true)
-                      setError('')
-                      try {
-                        const res = await resumeAPI.extractText(selectedFile)
-                        setResumeText(res.data.extracted_text)
-                        // Auto-analyze immediately
-                        setIsExtracting(false)
-                        setIsAnalyzing(true)
-                        try {
-                          const parsed = await resumeAPI.parse({
-                            resume_text: res.data.extracted_text,
-                            include_competency: includeCompetency,
-                          })
-                          setEvents(parsed.data.timeline_events)
-                          setCompetency(parsed.data.competency)
-                          setShowResult(true)
-                        } catch (err: any) {
-                          setError(err?.response?.data?.detail || '이력서 분석 중 오류가 발생했습니다.')
-                        } finally {
-                          setIsAnalyzing(false)
-                        }
-                      } catch (err: any) {
-                        setError(err?.response?.data?.detail || '파일에서 텍스트를 추출하지 못했습니다.')
-                        setIsExtracting(false)
-                      }
-                    }}
+                    onClick={handleFileDirectAnalyze}
                     disabled={isExtracting}
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
                                bg-[var(--museum)] text-[var(--ivory)] text-sm font-medium
