@@ -321,6 +321,33 @@ class MemoryResponse(MemoryBase):
 
 
 # ─────────────────────────────────────────────────────────
+# POST /api/archive/batch — Batch Archive Upload DTOs
+# ─────────────────────────────────────────────────────────
+class BatchArchiveItemInput(BaseModel):
+    """A single item in a batch upload request."""
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = None
+    category_id: Optional[int] = None
+    item_type: Optional[str] = None
+    tags: Optional[str] = ""
+    original_date: Optional[str] = None
+    source: Optional[str] = "resume_import"
+    custom_attributes: Optional[Dict[str, Any]] = None
+    is_public: Optional[bool] = True
+
+class BatchArchiveRequest(BaseModel):
+    """Request body for POST /api/archive/batch"""
+    owner_id: int = Field(..., description="ID of the user who owns these items")
+    items: List[BatchArchiveItemInput] = Field(..., min_length=1, description="List of items to create")
+
+class BatchArchiveResponse(BaseModel):
+    """Response body for POST /api/archive/batch"""
+    created_count: int
+    item_ids: List[int]
+    message: str
+
+
+# ─────────────────────────────────────────────────────────
 # Resume / CV Parsing Schemas
 # ─────────────────────────────────────────────────────────
 class ResumeParseRequest(BaseModel):

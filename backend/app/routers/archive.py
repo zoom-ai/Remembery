@@ -384,3 +384,69 @@ def get_archive_item(
     if not item:
         raise HTTPException(status_code=404, detail="Archive item not found")
     return item
+
+
+# ─────────────────────────────────────────────────────────
+# POST /batch — Batch create archive items (no file upload)
+# ─────────────────────────────────────────────────────────
+@router.post(
+    "/batch",
+    response_model=schemas.BatchArchiveResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Batch create archive items",
+    description="Creates multiple ArchiveItem records at once from structured data (e.g. resume import). "
+                "Does not support file uploads — only metadata and text fields.",
+)
+def batch_create_archive_items(
+    request: schemas.BatchArchiveRequest,
+    db: Session = Depends(get_db),
+):
+    # Validate owner exists
+    owner = crud.get_user(db, request.owner_id)
+    if not owner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id={request.owner_id} not found.",
+        )
+
+    created_ids = []
+    for item_input in request.items:
+        # Parse original_date string to datetime if provided
+        original_dt = None
+        if item_input.original_date:
+            try:
+                from datetime import datetime as dt
+                # Try common formats
+                for fmt in ["%Y-%m-%d", "%Y", "%Y-%m"]:
+                    try:
+                        original_dt = dt.strptime(item_input.original_date, fmt)
+                        break
+                    except ValueError:
+                        continue
+            except Exception:
+                original_dt = None
+
+        item_schema = schemas.ArchiveItemCreate(
+            owner_id=request.owner_id,
+            category_id=item_input.category_id,
+            title=item_input.title,
+            description=item_input.description,
+            item_type=item_input.item_type,
+            file_url=None,
+            thumbnail_url=None,
+            tags=item_input.tags or "",
+            metadata_json=None,
+            original_date=original_dt,
+            source=item_input.source or "resume_import",
+            custom_attributes=item_input.custom_attributes,
+            is_public=item_input.is_public if item_input.is_public is not None else True,
+        )
+        db_item = crud.create_archive_item(db, item_schema)
+        created_ids.append(db_item.id)
+
+    return schemas.BatchArchiveResponse(
+        created_count=len(created_ids),
+        item_ids=created_ids,
+        message=f"{len(created_ids)}개의 기록물이 라이브러리에 성공적으로 저장되었습니다.",
+    )
+

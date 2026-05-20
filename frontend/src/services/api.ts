@@ -223,6 +223,18 @@ export const archiveAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
+
+  batch: (data: {
+    owner_id: number
+    items: Array<{
+      title: string
+      description?: string
+      original_date?: string
+      source?: string
+      tags?: string
+      custom_attributes?: Record<string, any>
+    }>
+  }) => API.post<BatchArchiveResponse>('/archive/batch', data),
 }
 
 export const userAPI = {
@@ -273,6 +285,38 @@ export const exhibitionAPI = {
     theme_color?: string
     layout_style?: string
   }) => API.post<CurationResponse>('/exhibition/curate', data),
+}
+
+/* ────────────── Resume API ────────────── */
+
+export interface ResumeTimelineEvent {
+  year: string
+  title: string
+  description: string
+  category: string
+}
+
+export interface ResumeCompetency {
+  key: string
+  label: string
+  score: number
+  reason: string
+}
+
+export interface ResumeParseResponse {
+  timeline_events: ResumeTimelineEvent[]
+  competency: ResumeCompetency[] | null
+}
+
+export interface BatchArchiveResponse {
+  created_count: number
+  item_ids: number[]
+  message: string
+}
+
+export const resumeAPI = {
+  parse: (data: { resume_text: string; include_competency: boolean }) =>
+    API.post<ResumeParseResponse>('/resume/parse', data),
 }
 
 export default API
