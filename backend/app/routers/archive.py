@@ -17,6 +17,8 @@ import json
 
 from app import models, crud, schemas
 from app.database import get_db
+from app.routers.auth import get_current_user
+
 
 router = APIRouter(
     prefix="/archive",
@@ -155,7 +157,7 @@ def parse_image_exif(
 )
 def upload_archive_item(
     background_tasks: BackgroundTasks,
-    owner_id: int = Form(...),
+    owner_id: Optional[int] = Form(None),
     title: str = Form(...),
     description: Optional[str] = Form(None),
     category_id: Optional[int] = Form(None),
@@ -167,15 +169,10 @@ def upload_archive_item(
     auto_index: bool = Form(False),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    # 1. Validate that the owner exists
-    owner = crud.get_user(db, owner_id)
-    if not owner:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id={owner_id} not found. "
-                   "Please register the owner first.",
-        )
+    # Enforce multi-tenant scoping: set owner_id to current_user.id
+    owner_id = current_user.id
 
     # Resolve category name for directory creation and context enrichment
     category_label = ""
@@ -183,6 +180,11 @@ def upload_archive_item(
     if category_id:
         cat = crud.get_category(db, category_id)
         if cat:
+            if not cat.is_default and cat.user_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to use this category"
+                )
             category_label = cat.name
             # Create a safe directory name
             cat_dir_name = re.sub(r'[^a-zA-Z0-9_\-\uac00-\ud7a3]', '_', cat.name)
@@ -315,13 +317,12 @@ def list_archive_items(
     skip: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(20, ge=1, le=100, description="Page size"),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    # Build dynamic query
-    query = db.query(models.ArchiveItem)
+    # Build dynamic query strictly isolated to current_user.id
+    query = db.query(models.ArchiveItem).filter(models.ArchiveItem.user_id == current_user.id)
 
     # Apply filters
-    if owner_id is not None:
-        query = query.filter(models.ArchiveItem.owner_id == owner_id)
     if category_id is not None:
         query = query.filter(models.ArchiveItem.category_id == category_id)
     if item_type is not None:
@@ -362,7 +363,7 @@ def list_archive_items(
             "q": q,
             "item_type": item_type,
             "category_id": category_id,
-            "owner_id": owner_id,
+            "owner_id": current_user.id,
             "is_public": is_public,
         },
     )
@@ -379,10 +380,16 @@ def list_archive_items(
 def get_archive_item(
     item_id: int,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     item = crud.get_archive_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Archive item not found")
+    if item.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this archive item"
+        )
     return item
 
 
@@ -400,14 +407,20 @@ def get_archive_item(
 def batch_create_archive_items(
     request: schemas.BatchArchiveRequest,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    # Validate owner exists
-    owner = crud.get_user(db, request.owner_id)
-    if not owner:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id={request.owner_id} not found.",
-        )
+    # Enforce multi-tenant scoping: set request.owner_id to current_user.id
+    request.owner_id = current_user.id
+
+    # Validate that categories used in batch items are authorized
+    for item_input in request.items:
+        if item_input.category_id:
+            cat = crud.get_category(db, item_input.category_id)
+            if not cat or (not cat.is_default and cat.user_id != current_user.id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Not authorized to use category with ID {item_input.category_id}"
+                )
 
     created_ids = []
     for item_input in request.items:

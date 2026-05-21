@@ -56,6 +56,13 @@ Curate a beautiful personal art gallery automatically using our AI-driven spatia
   * `Cinematic Spotlight` (An elegant theatrical slideshow carousel that highlights large serif quotes and one focus piece at a time)
   * `Bento Collage` (A modern, asymmetrical collage displaying items in dynamic masonry ratios)
 
+### 6. Secure Multi-User Space Isolation (JWT)
+Manage your digital library privately and securely away from other guests.
+* **JWT-Based Session Security**: Encrypted JSON Web Tokens (JWT) manage active authentication sessions securely. Register and log in via sleek interactive portals.
+* **Axios Request Interceptor**: Every outbound API call automatically injects the active token (`Authorization: Bearer {token}`), ensuring all requests are authenticated.
+* **Strict Database Scoping**: All database operations (Category listings, Timeline queries, File uploads, and AI virtual galleries) are strictly scoped and bound using user authentication filters (`user_id == current_user.id`).
+* **Vector RAG Isolation**: Semantic search queries to the AI Docent retrieve exclusively the authenticated user's chunk data, guaranteeing no cross-user information leakage.
+
 ---
 
 ## Ⅲ. Technology Stack
@@ -75,7 +82,12 @@ Remembery is built upon a high-performance modern web stack ensuring visual exce
 
 ## Ⅳ. Step-by-Step Archiving Guide
 
-Preserve your life story in five simple steps.
+Preserve your life story in six simple steps.
+
+### Step 0: Register & Create Your Personal Library
+1. When you first visit Remembery, you will be greeted by an elegant, gallery-themed authentication portal.
+2. Click `Sign Up` to create your private library using your email, password, and name.
+3. Once registered, log in to your personal dashboard. Your dashboard will start as a clean, beautiful blank canvas, completely isolated from other users' records.
 
 ### Step 1: Create a Custom Category
 1. Click the `Add New Category` button on your dashboard.
@@ -124,6 +136,15 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Automatic DB Migrations & Isolation Tests
+* **Schema Upgrades**: The backend checks SQLite tables automatically at startup. If missing, it adds `user_id` foreign keys to categories, archives, and exhibitions, backfilling existing records to the default admin user.
+* **Testing Isolation**: You can run backend automated multi-user logic and strict authentication verification tests using:
+  ```bash
+  cd backend
+  python test_multi_user.py
+  python test_auth_isolation.py
+  ```
 
 ---
 

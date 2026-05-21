@@ -45,7 +45,8 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     db_user = models.User(
         email=user.email,
         display_name=user.display_name,
-        hashed_password=user.password,  # TODO: hash with bcrypt in production
+        name=user.display_name,  # Added for multi-user compatibility
+        hashed_password=user.password,
         role=user.role,
         subtitle=user.subtitle,
         title=user.title,
@@ -57,6 +58,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     db.commit()
     db.refresh(db_user)
     return db_user
+
 
 def create_owner(db: Session, req: schemas.OnboardingRequest) -> models.User:
     db_user = models.User(
@@ -180,6 +182,7 @@ def get_archive_item(db: Session, item_id: int) -> Optional[models.ArchiveItem]:
 def create_archive_item(db: Session, item: schemas.ArchiveItemCreate) -> models.ArchiveItem:
     db_item = models.ArchiveItem(
         owner_id=item.owner_id,
+        user_id=item.owner_id,  # Added for multi-user compatibility
         category_id=item.category_id,
         title=item.title,
         description=item.description,

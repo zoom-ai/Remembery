@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 from app import models, crud, schemas
 from app.database import get_db
 from app.services import ai_service
+from app.routers.auth import get_current_user
+
 
 router = APIRouter(
     prefix="/categories",
@@ -45,20 +47,15 @@ DEFAULT_CATEGORIES = [
 def create_category(
     payload: schemas.CategoryCreate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    # Validate user exists if user_id is provided
-    if payload.user_id is not None:
-        user = crud.get_user(db, payload.user_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User with id={payload.user_id} not found.",
-            )
+    # Enforce scoping: set user_id to current_user.id
+    payload.user_id = current_user.id
 
-    # Check for duplicate name under the same user
+    # Check for duplicate name under the same user scope
     existing = db.query(models.Category).filter(
         models.Category.name == payload.name,
-        models.Category.user_id == payload.user_id,
+        models.Category.user_id == current_user.id,
     ).first()
     if existing:
         raise HTTPException(
@@ -78,10 +75,11 @@ def create_category(
     summary="List categories (defaults + user custom)",
 )
 def list_categories(
-    user_id: Optional[int] = Query(None, description="Filter by user; always includes system defaults"),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    return crud.get_categories(db, user_id=user_id, include_defaults=True)
+    # Retrieve user's custom categories plus system defaults
+    return crud.get_categories(db, user_id=current_user.id, include_defaults=True)
 
 
 # ─────────────────────────────────────────────────────────
@@ -97,6 +95,7 @@ def list_categories(
 def suggest_fields(
     category_name: str = Query(..., description="The name of the category (e.g. '학술 논문')"),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     if not category_name or not category_name.strip():
         raise HTTPException(
@@ -114,10 +113,16 @@ def suggest_fields(
     response_model=schemas.CategoryResponse,
     summary="Get a single category by ID",
 )
-def get_category(category_id: int, db: Session = Depends(get_db)):
+def get_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     cat = crud.get_category(db, category_id)
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
+    if not cat.is_default and cat.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this category")
     return cat
 
 
@@ -136,24 +141,28 @@ def update_category(
     category_id: int,
     payload: schemas.CategoryUpdate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     cat = crud.get_category(db, category_id)
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    # Protect system default category names from renaming
-    if cat.is_default and payload.name is not None and payload.name != cat.name:
+    if cat.is_default:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="System default category names cannot be renamed. "
-                   "You can update description, icon, and color.",
+            detail="System default categories cannot be modified."
+        )
+    if cat.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this category."
         )
 
     # Check for duplicate name under the same user scope
     if payload.name is not None and payload.name != cat.name:
         existing = db.query(models.Category).filter(
             models.Category.name == payload.name,
-            models.Category.user_id == cat.user_id,
+            models.Category.user_id == current_user.id,
             models.Category.id != category_id,
         ).first()
         if existing:
@@ -174,7 +183,11 @@ def update_category(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a custom category (defaults are protected)",
 )
-def delete_category(category_id: int, db: Session = Depends(get_db)):
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     cat = crud.get_category(db, category_id)
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -182,6 +195,11 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="System default categories cannot be deleted.",
+        )
+    if cat.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this category.",
         )
     crud.delete_category(db, category_id)
 
@@ -195,7 +213,10 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     summary="Seed default system categories",
     description="Idempotent: only creates defaults that don't already exist.",
 )
-def seed_default_categories(db: Session = Depends(get_db)):
+def seed_default_categories(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     created = []
     for cat_data in DEFAULT_CATEGORIES:
         existing = db.query(models.Category).filter(
@@ -215,3 +236,4 @@ def seed_default_categories(db: Session = Depends(get_db)):
         else:
             created.append(existing)
     return created
+

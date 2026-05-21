@@ -10,6 +10,20 @@ const API = axios.create({
   timeout: 15000,
 })
 
+// Request Interceptor: Attach JWT Bearer Token if it exists in localStorage
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('remembery_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
 /* ────────────── Types ────────────── */
 
 export interface User {
@@ -335,6 +349,23 @@ export const resumeAPI = {
       timeout: 30000,
     })
   },
+}
+
+/* ────────────── Auth API ────────────── */
+
+export interface Token {
+  access_token: string
+  token_type: string
+}
+
+export const authAPI = {
+  signup: (data: { email: string; password: string; name: string }) =>
+    API.post<User>('/auth/signup', data),
+
+  login: (data: { email: string; password: string }) =>
+    API.post<Token>('/auth/login', data),
+
+  me: () => API.get<User>('/auth/me'),
 }
 
 export default API

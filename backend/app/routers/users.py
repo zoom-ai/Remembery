@@ -3,8 +3,9 @@ import shutil
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
-from app import schemas, crud
+from app import schemas, crud, models
 from app.database import get_db
+from app.routers.auth import get_current_user
 
 router = APIRouter(
     prefix="/users",
@@ -12,73 +13,72 @@ router = APIRouter(
 )
 
 @router.get("/owner", response_model=schemas.UserResponse, summary="Get the main protagonist (owner)")
-def get_owner(db: Session = Depends(get_db)):
+def get_owner(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """
-    Returns the primary user of the Remembery instance.
-    If none exists, returns 404.
+    Returns the primary user of the Remembery instance (the currently logged in user).
     """
-    owner = crud.get_owner(db)
-    if not owner:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Owner not found. Onboarding is required."
-        )
-    return owner
+    return current_user
 
 @router.post("/onboard", response_model=schemas.UserResponse, summary="Onboard the main protagonist")
-def onboard_owner(payload: schemas.OnboardingRequest, db: Session = Depends(get_db)):
+def onboard_owner(
+    payload: schemas.OnboardingRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """
-    Creates the first 'owner' user. If one already exists, throws an error.
+    Onboards the current logged-in user by updating their profile details.
     """
-    existing_owner = crud.get_owner(db)
-    if existing_owner:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An owner already exists."
-        )
+    current_user.display_name = payload.display_name
+    current_user.title = payload.title
+    current_user.bio = payload.bio
+    current_user.birth_date = payload.birth_date
+    current_user.death_date = payload.death_date
+    current_user.birth_place = payload.birth_place
+    current_user.resting_place = payload.resting_place
+    current_user.motto = payload.motto
+    current_user.timeline_json = payload.timeline_json
+    current_user.role = "owner"  # Elevate role to owner
     
-    owner = crud.create_owner(db, payload)
-    return owner
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 @router.post("/timeline", response_model=schemas.UserResponse, summary="Add a new event to the owner's timeline")
-def add_timeline_event(payload: schemas.TimelineEventCreate, db: Session = Depends(get_db)):
+def add_timeline_event(
+    payload: schemas.TimelineEventCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """
-    Appends a new timeline event to the owner's timeline_json array.
+    Appends a new timeline event to the current user's timeline_json array.
     """
-    owner = crud.get_owner(db)
-    if not owner:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Owner not found. Onboarding is required."
-        )
-    
-    updated_owner = crud.add_timeline_event(db, owner, payload)
+    updated_owner = crud.add_timeline_event(db, current_user, payload)
     return updated_owner
 
 @router.patch("/owner", response_model=schemas.UserResponse, summary="Update the main protagonist's profile")
-def update_owner_profile(payload: schemas.UserProfileUpdate, db: Session = Depends(get_db)):
+def update_owner_profile(
+    payload: schemas.UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """
-    Updates text metadata for the owner profile.
+    Updates text metadata for the current user's profile.
     """
-    owner = crud.get_owner(db)
-    if not owner:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Owner not found."
-        )
-    
-    updated_owner = crud.update_owner(db, owner, payload)
+    updated_owner = crud.update_owner(db, current_user, payload)
     return updated_owner
 
 @router.post("/owner/avatar", response_model=schemas.UserResponse, summary="Upload avatar image for owner")
-def upload_owner_avatar(file: UploadFile = File(...), db: Session = Depends(get_db)):
+def upload_owner_avatar(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """
-    Uploads an avatar image and updates the owner's avatar_url.
+    Uploads an avatar image and updates the current user's avatar_url.
     """
-    owner = crud.get_owner(db)
-    if not owner:
-        raise HTTPException(status_code=404, detail="Owner not found.")
-
     # Create avatars directory if it doesn't exist
     upload_dir = os.path.join("uploads", "avatars")
     os.makedirs(upload_dir, exist_ok=True)
@@ -90,8 +90,8 @@ def upload_owner_avatar(file: UploadFile = File(...), db: Session = Depends(get_
     with open(filepath, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    owner.avatar_url = f"/uploads/avatars/{filename}"
+    current_user.avatar_url = f"/uploads/avatars/{filename}"
     db.commit()
-    db.refresh(owner)
+    db.refresh(current_user)
     
-    return owner
+    return current_user

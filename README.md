@@ -98,6 +98,12 @@ Define adaptive metadata models for any type of archive (Papers, Sensory Diaries
 *   Renders a beautiful **`UploadPreview`** container showing **Capture Time**, **Camera Model**, and **GPS Coordinates** as responsive chips.
 *   **Smart Auto-fill**: Automatically re-formats EXIF dates and pre-fills the "Original Date" form, while matching GPS coords to custom location parameters instantly.
 
+### 🔒 Secure Multi-User Architecture & Strict Data Isolation
+*   **Decoupled JWT Session Authentication**: Renders customizable entry cards for **Login** and **Signup**. Integrates a global React `AuthContext` utilizing browser `localStorage` sessions and secure automatic headers injection via an Axios request interceptor (`Authorization: Bearer {token}`).
+*   **Automatic SQLite Schema Upgrades & Backfills**: Runs on-the-fly table inspection (`PRAGMA table_info`) at backend startup to seamlessly append missing `user_id` foreign key columns and safely link legacy files to the protagonist.
+*   **Mathematical Multi-Tenant Isolation**: Locks down all category listings, file uploads, AI curations, RAG semantic search logs, and timeline events to the specific authenticated user (`user_id == current_user.id`), making cross-user data leakage absolutely impossible.
+
+
 ---
 
 ## 🛠️ 3. Full-Stack Tech Stack
@@ -216,6 +222,8 @@ Remembery leverages a robust, modern stack selected for durability, portability,
 - [x] **AI Docent RAG Q&A integration** utilizing custom metadata attribute synthesis
 - [x] **AI Resume Timeline Importer** supporting dual-input modes (text paste / PDF / DOCX / TXT file uploads) and a premium interactive preview/edit grid
 - [x] **AI Career Competency Radar Report** rendering a high-fidelity 5-axis Chart.js Radar visualization with personalized AI Docent commentary
+- [x] **Secure Multi-User Architecture** with JWT Authentication & Strict Database Scoping (FastAPI + JWT + React Context + Axios Interceptor)
+
 
 ---
 

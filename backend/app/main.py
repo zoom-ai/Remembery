@@ -4,10 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app import models
 from app.database import engine
-from app.routers import memories, archive, ai, exhibition, category, users, resume
+from app.database_migration import run_migrations
+from app.routers import memories, archive, ai, exhibition, category, users, resume, auth
 
 # Create uploads directory if it doesn't exist
 os.makedirs("uploads", exist_ok=True)
+
+# Run database migrations to dynamically update SQLite tables
+run_migrations()
 
 # Automatically create database tables on startup
 models.Base.metadata.create_all(bind=engine)
@@ -17,6 +21,7 @@ app = FastAPI(
     description=(
         "Backend API for Remembery — The Eternal Digital Library of Human Legacies.\n\n"
         "**Core Endpoints:**\n"
+        "- `/api/auth` — User registration, login, and profile retrieval\n"
         "- `/api/archive` — Upload, search, and manage digital archive items\n"
         "- `/api/ai` — RAG-powered Q&A with the archived legacy\n"
         "- `/api/exhibition` — AI-curated online exhibition generation\n"
@@ -45,7 +50,9 @@ app.add_middleware(
 )
 
 # Mount API Routers
+app.include_router(auth.router, prefix="/api")
 app.include_router(archive.router, prefix="/api")
+
 app.include_router(ai.router, prefix="/api")
 app.include_router(exhibition.router, prefix="/api")
 app.include_router(category.router, prefix="/api")

@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas, crud
 from app.database import get_db
+from app.routers.auth import get_current_user
 
 router = APIRouter(
     prefix="/exhibition",
@@ -59,9 +60,10 @@ def _mock_select_items_for_theme(
       2. Perform vector similarity search in AIMemoryIndex.
       3. Re-rank results with an LLM for thematic coherence.
     """
-    # Keyword-based fallback search
+    # Keyword-based fallback search strictly scoped to the curator_id
     search_pattern = f"%{theme}%"
     query = db.query(models.ArchiveItem).filter(
+        models.ArchiveItem.user_id == curator_id,
         or_(
             models.ArchiveItem.title.ilike(search_pattern),
             models.ArchiveItem.description.ilike(search_pattern),
@@ -71,12 +73,15 @@ def _mock_select_items_for_theme(
 
     matched = query.limit(max_items).all()
 
-    # If keyword search returns too few, supplement with recent items
+    # If keyword search returns too few, supplement with recent items from the same curator
     if len(matched) < max_items:
         existing_ids = {item.id for item in matched}
         supplement = (
             db.query(models.ArchiveItem)
-            .filter(models.ArchiveItem.id.notin_(existing_ids))
+            .filter(
+                models.ArchiveItem.user_id == curator_id,
+                models.ArchiveItem.id.notin_(existing_ids)
+            )
             .order_by(models.ArchiveItem.created_at.desc())
             .limit(max_items - len(matched))
             .all()
@@ -183,17 +188,13 @@ def _mock_generate_exhibition_meta(
 def curate_exhibition(
     payload: schemas.CurationRequest,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    # 1. Validate the curator exists
-    curator = crud.get_user(db, payload.curator_id)
-    if not curator:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Curator user with id={payload.curator_id} not found.",
-        )
+    # Enforce multi-tenant scoping: override curator_id to current_user.id
+    payload.curator_id = current_user.id
 
-    # 2. Count total items reviewed (for analytics display)
-    total_items_in_archive = db.query(models.ArchiveItem).count()
+    # 2. Count total items reviewed (for analytics display) - strictly scoped to current_user.id
+    total_items_in_archive = db.query(models.ArchiveItem).filter(models.ArchiveItem.user_id == current_user.id).count()
 
     # 3. Select relevant items for the theme
     selected_items = _mock_select_items_for_theme(

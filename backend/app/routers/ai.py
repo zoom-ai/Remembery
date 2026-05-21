@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas, crud
 from app.database import get_db
+from app.routers.auth import get_current_user
 
 router = APIRouter(
     prefix="/ai",
@@ -75,7 +76,7 @@ def _mock_semantic_search(
         .filter(models.AIMemoryIndex.is_indexed == True)  # noqa: E712
     )
     if owner_id:
-        query = query.filter(models.ArchiveItem.owner_id == owner_id)
+        query = query.filter(models.ArchiveItem.user_id == owner_id)
 
     indexed_items = query.limit(50).all()
 
@@ -83,7 +84,7 @@ def _mock_semantic_search(
         # Fallback: pull any archive items even if not yet indexed
         fallback_query = db.query(models.ArchiveItem)
         if owner_id:
-            fallback_query = fallback_query.filter(models.ArchiveItem.owner_id == owner_id)
+            fallback_query = fallback_query.filter(models.ArchiveItem.user_id == owner_id)
         fallback_items = fallback_query.limit(top_k).all()
 
         return [
@@ -193,11 +194,15 @@ def _mock_llm_generate(question: str, context_chunks: List[dict], language: str 
 def rag_query(
     payload: schemas.RAGQueryRequest,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
+    # Enforce multi-tenant scoping: set owner_id to current_user.id
+    payload.owner_id = current_user.id
+
     # 1. Embed the question
     query_embedding = _mock_embed_query(payload.question)
 
-    # 2. Semantic retrieval — find top-K relevant archive items
+    # 2. Semantic retrieval — find top-K relevant archive items strictly scoped to the user
     context_chunks = _mock_semantic_search(
         db=db,
         query_embedding=query_embedding,

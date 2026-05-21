@@ -92,6 +92,7 @@ class User(Base):
     id: Mapped[int]                 = mapped_column(Integer, primary_key=True, index=True)
     email: Mapped[str]              = mapped_column(String(255), unique=True, index=True, nullable=False)
     display_name: Mapped[str]       = mapped_column(String(100), nullable=False)
+    name: Mapped[Optional[str]]     = mapped_column(String(100), nullable=True) # Added for multi-user compatibility
     hashed_password: Mapped[str]    = mapped_column(String(255), nullable=False)
     role: Mapped[str]               = mapped_column(String(20), default=UserRole.VISITOR.value)
     subtitle: Mapped[Optional[str]] = mapped_column(String(100), nullable=True) # Deprecated, use birth_date/death_date
@@ -110,13 +111,22 @@ class User(Base):
 
     # ── Relationships ────────────────────────────────────
     archive_items: Mapped[List["ArchiveItem"]] = relationship(
-        "ArchiveItem", back_populates="owner", cascade="all, delete-orphan", lazy="selectin"
+        "ArchiveItem", foreign_keys="ArchiveItem.owner_id", back_populates="owner", cascade="all, delete-orphan", lazy="selectin"
+    )
+    archive_items_by_user: Mapped[List["ArchiveItem"]] = relationship(
+        "ArchiveItem", foreign_keys="ArchiveItem.user_id", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
     exhibitions: Mapped[List["Exhibition"]] = relationship(
-        "Exhibition", back_populates="curator", cascade="all, delete-orphan", lazy="selectin"
+        "Exhibition", foreign_keys="Exhibition.curator_id", back_populates="curator", cascade="all, delete-orphan", lazy="selectin"
+    )
+    exhibitions_by_user: Mapped[List["Exhibition"]] = relationship(
+        "Exhibition", foreign_keys="Exhibition.user_id", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
     categories: Mapped[List["Category"]] = relationship(
         "Category", back_populates="creator", cascade="all, delete-orphan", lazy="selectin"
+    )
+    memories: Mapped[List["Memory"]] = relationship(
+        "Memory", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
 
     def __repr__(self) -> str:
@@ -183,6 +193,7 @@ class ArchiveItem(Base):
 
     id: Mapped[int]                 = mapped_column(Integer, primary_key=True, index=True)
     owner_id: Mapped[int]           = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[Optional[int]]  = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True) # Added for multi-user compatibility
     category_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True
     )  # New: references the Category table
@@ -210,7 +221,8 @@ class ArchiveItem(Base):
     updated_at: Mapped[datetime]    = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # ── Relationships ────────────────────────────────────
-    owner: Mapped["User"] = relationship("User", back_populates="archive_items")
+    owner: Mapped["User"] = relationship("User", foreign_keys=[owner_id], back_populates="archive_items")
+    user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id], back_populates="archive_items_by_user")
     category: Mapped[Optional["Category"]] = relationship("Category", back_populates="archive_items")
 
     exhibitions: Mapped[List["Exhibition"]] = relationship(
@@ -241,6 +253,7 @@ class Exhibition(Base):
 
     id: Mapped[int]                 = mapped_column(Integer, primary_key=True, index=True)
     curator_id: Mapped[int]         = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[Optional[int]]  = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True) # Added for multi-user compatibility
 
     # Exhibition metadata
     title: Mapped[str]              = mapped_column(String(200), index=True, nullable=False)
@@ -263,7 +276,8 @@ class Exhibition(Base):
     updated_at: Mapped[datetime]    = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # ── Relationships ────────────────────────────────────
-    curator: Mapped["User"] = relationship("User", back_populates="exhibitions")
+    curator: Mapped["User"] = relationship("User", foreign_keys=[curator_id], back_populates="exhibitions")
+    user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id], back_populates="exhibitions_by_user")
 
     items: Mapped[List["ArchiveItem"]] = relationship(
         "ArchiveItem", secondary=exhibition_items, back_populates="exhibitions", lazy="selectin"
@@ -331,9 +345,13 @@ class Memory(Base):
     __tablename__ = "memories"
 
     id: Mapped[int]              = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True) # Added for multi-user compatibility
     title: Mapped[str]           = mapped_column(String(200), index=True, nullable=False)
     content: Mapped[str]         = mapped_column(Text, nullable=False)
     tags: Mapped[Optional[str]]  = mapped_column(String, default="")
     category: Mapped[Optional[str]] = mapped_column(String, default="General")
     date: Mapped[Optional[datetime]]       = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # ── Relationships ────────────────────────────────────
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="memories")
