@@ -611,7 +611,7 @@ export default function ResumeImporter({ onImported }: Props) {
                 </span>
               </label>
               <span className="text-xs text-[var(--taupe)]">
-                {resumeText.length.toLocaleString()} / 30,000자
+                {resumeText.length.toLocaleString()} / 100,000자
               </span>
             </div>
 

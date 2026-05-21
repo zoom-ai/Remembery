@@ -355,7 +355,7 @@ class ResumeParseRequest(BaseModel):
     resume_text: str = Field(
         ...,
         min_length=10,
-        max_length=30000,
+        max_length=100000,
         description="Plain-text content of the resume / CV to analyze."
     )
     include_competency: bool = Field(
