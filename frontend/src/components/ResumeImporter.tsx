@@ -22,6 +22,39 @@ import {
 } from 'lucide-react'
 import { resumeAPI, archiveAPI } from '../services/api'
 
+/* ── 에러 메시지 유틸 ─────────────────────────────── */
+function getErrorMessage(err: any, context: 'extract' | 'parse' | 'save'): string {
+  // 1. 서버 응답이 있는 경우 — API에서 보낸 에러 메시지
+  if (err?.response?.data?.detail) {
+    const detail = err.response.data.detail
+    return typeof detail === 'string' ? detail : JSON.stringify(detail)
+  }
+
+  // 2. 네트워크 에러 (서버 꺼짐, CORS 차단 등)
+  if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
+    return '백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요. (http://localhost:8000)'
+  }
+
+  // 3. 타임아웃
+  if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+    return 'AI 분석 요청이 시간 초과되었습니다. 네트워크 연결을 확인하고 다시 시도해 주세요.'
+  }
+
+  // 4. HTTP 상태 코드별
+  const status = err?.response?.status
+  if (status === 422) return '파일 형식을 처리할 수 없습니다. 텍스트가 포함된 PDF/DOCX/TXT 파일인지 확인해 주세요.'
+  if (status === 413) return '파일 크기가 너무 큽니다. 10MB 이하의 파일을 업로드해 주세요.'
+  if (status === 500) return '서버 내부 오류가 발생했습니다. Gemini API 키가 올바르게 설정되어 있는지 확인해 주세요.'
+
+  // 5. 기본 메시지
+  const messages = {
+    extract: '파일에서 텍스트를 추출하지 못했습니다. 다른 파일을 시도해 주세요.',
+    parse: '이력서 분석 중 오류가 발생했습니다. 백엔드 서버가 실행 중인지 확인해 주세요.',
+    save: '저장 중 오류가 발생했습니다. 다시 시도해 주세요.',
+  }
+  return messages[context]
+}
+
 interface ResumeEvent {
   year: string
   title: string
@@ -113,8 +146,7 @@ export default function ResumeImporter({ onImported }: Props) {
       setResumeText(text)
       setInputMode('text')
     } catch (err: any) {
-      const detail = err?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : '파일에서 텍스트를 추출하지 못했습니다. 다른 파일을 시도해 주세요.')
+      setError(getErrorMessage(err, 'extract'))
     } finally {
       setIsExtracting(false)
     }
@@ -153,14 +185,12 @@ export default function ResumeImporter({ onImported }: Props) {
         setCompetency(parsed.data.competency || null)
         setShowResult(true)
       } catch (err: any) {
-        const detail = err?.response?.data?.detail
-        setError(typeof detail === 'string' ? detail : '이력서 분석 중 오류가 발생했습니다. 다시 시도해 주세요.')
+        setError(getErrorMessage(err, 'parse'))
       } finally {
         setIsAnalyzing(false)
       }
     } catch (err: any) {
-      const detail = err?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : '파일에서 텍스트를 추출하지 못했습니다. 다른 파일을 시도해 주세요.')
+      setError(getErrorMessage(err, 'extract'))
       setIsExtracting(false)
     }
   }
@@ -203,8 +233,7 @@ export default function ResumeImporter({ onImported }: Props) {
       setCompetency(res.data.competency || null)
       setShowResult(true)
     } catch (err: any) {
-      const detail = err?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : '이력서 분석 중 오류가 발생했습니다. 다시 시도해 주세요.')
+      setError(getErrorMessage(err, 'parse'))
     } finally {
       setIsAnalyzing(false)
     }
@@ -231,8 +260,7 @@ export default function ResumeImporter({ onImported }: Props) {
       setSaveSuccess(true)
       setTimeout(() => onImported(), 1800)
     } catch (err: any) {
-      const detail = err?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : '저장 중 오류가 발생했습니다.')
+      setError(getErrorMessage(err, 'save'))
     } finally {
       setIsSaving(false)
     }

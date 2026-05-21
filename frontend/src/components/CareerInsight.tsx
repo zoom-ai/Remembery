@@ -82,7 +82,19 @@ export default function CareerInsight({ owner }: Props) {
         setError('역량 분석 결과가 없습니다. 좀 더 구체적인 이력서 내용을 입력해 주세요.')
       }
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '역량 분석 중 오류가 발생했습니다.')
+      // Detailed error messaging
+      if (err?.response?.data?.detail) {
+        const detail = err.response.data.detail
+        setError(typeof detail === 'string' ? detail : JSON.stringify(detail))
+      } else if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
+        setError('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요. (http://localhost:8000)')
+      } else if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+        setError('AI 분석 요청이 시간 초과되었습니다. 네트워크 연결을 확인하고 다시 시도해 주세요.')
+      } else if (err?.response?.status === 500) {
+        setError('서버 내부 오류가 발생했습니다. Gemini API 키가 올바르게 설정되어 있는지 확인해 주세요.')
+      } else {
+        setError('역량 분석 중 오류가 발생했습니다. 백엔드 서버가 실행 중인지 확인해 주세요.')
+      }
     } finally {
       setIsAnalyzing(false)
     }
