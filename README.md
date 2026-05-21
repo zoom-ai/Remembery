@@ -214,6 +214,8 @@ Remembery leverages a robust, modern stack selected for durability, portability,
 - [x] **Real-time Photo EXIF Parsing** on file change with high-fidelity `UploadPreview` tags
 - [x] **Smart Form Auto-fill** mapping capture date and coordinates to custom category properties
 - [x] **AI Docent RAG Q&A integration** utilizing custom metadata attribute synthesis
+- [x] **AI Resume Timeline Importer** supporting dual-input modes (text paste / PDF / DOCX / TXT file uploads) and a premium interactive preview/edit grid
+- [x] **AI Career Competency Radar Report** rendering a high-fidelity 5-axis Chart.js Radar visualization with personalized AI Docent commentary
 
 ---
 
