@@ -45,7 +45,7 @@ def _call_gemini_api(contents: list, model: str = "gemini-2.5-flash") -> Optiona
             data=data,
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=20) as response:
+        with urllib.request.urlopen(req, timeout=60) as response:
             res_data = response.read().decode("utf-8")
             res_json = json.loads(res_data)
             
@@ -496,6 +496,39 @@ def suggest_custom_fields_ai(category_name: str) -> List[Dict[str, str]]:
     return fallback_suggestions
 
 
+def _is_date_only_text(text: str) -> bool:
+    """
+    Checks if the text contains only date indicators (months, year-like numbers, ranges, symbols, present/current).
+    Used to filter out date-only lines in regex fallbacks.
+    """
+    t = text.lower().strip()
+    
+    # Remove standard month abbreviations/names
+    months = [
+        "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+        "january", "february", "march", "april", "june", "july", "august", "september", "october", "november", "december"
+    ]
+    # Remove other date/time indicators
+    time_words = ["present", "current", "to", "till", "from", "현재", "진행중", "진행", "월", "년", "일"]
+    
+    # Remove all numbers (since years/days might be left)
+    t = re.sub(r'\d+', '', t)
+    
+    # Remove month words
+    for m in months:
+        t = re.sub(r'\b' + m + r'\b', '', t)
+    # Remove time words
+    for w in time_words:
+        t = re.sub(r'\b' + w + r'\b', '', t)
+        t = t.replace(w, '')
+        
+    # Remove common punctuation and whitespace
+    t = re.sub(r'[ \t\r\n\-\–\—\.\,\~\/\(\)\[\]\•\·\●]', '', t)
+    
+    # If the remaining string is extremely short or empty, it's a date-only string!
+    return len(t) <= 1
+
+
 def parse_resume_text(resume_text: str) -> List[Dict[str, Any]]:
     """
     Parses resume/CV plain text via Gemini API and extracts structured timeline
@@ -508,15 +541,17 @@ def parse_resume_text(resume_text: str) -> List[Dict[str, Any]]:
     # ── 1. Gemini API path ──────────────────────────────────────────────
     if GEMINI_API_KEY:
         prompt = (
-            "다음 이력서(Resume/CV) 텍스트에서 학력, 경력, 주요 성취를 추출하여 "
-            "JSON 배열로 반환해 주세요. 각 항목은 다음 키를 포함해야 합니다:\n"
-            "- year (string): 해당 이벤트의 연도 또는 기간 (예: '2015', '2018-2020')\n"
-            "- title (string): 활동 명칭 또는 직함 (예: '삼성전자 소프트웨어 엔지니어')\n"
-            "- description (string): 한국어로 된 상세 설명 (1-2문장)\n"
-            "- category (string): 다음 중 하나 — 'career', 'study', 'project', 'award'\n\n"
-            "다른 설명 텍스트 없이 오직 유효한 JSON 배열만 반환해야 합니다.\n"
-            "연도 순서대로 오래된 것부터 정렬해 주세요.\n\n"
-            f"이력서 텍스트:\n---\n{resume_text[:8000]}\n---"
+            "당신은 개인 아카이빙 및 이력서 분석 전문가입니다. 다음 이력서(Resume/CV) 텍스트에서 학력, 경력, 프로젝트, 수상 등 주요 성취를 정확히 추출하여 "
+            "JSON 배열로 반환해 주세요. 각 항목은 다음 키를 반드시 포함해야 합니다:\n"
+            "- year (string): 해당 이벤트의 연도 또는 전체 기간 (예: '2018 - 2020', '2019 - 현재', '2015'). 단일 연도뿐만 아니라 'Nov. 2019 - present' 처럼 상세 기간이 있으면 전체 기간을 표기해 주세요.\n"
+            "- title (string): 회사명/기관명과 직함/활동명을 함께 포함한 명확한 제목 (예: 'Google - Software Engineer', '서울대학교 - 컴퓨터공학 학사')\n"
+            "- description (string): 해당 직무, 학업, 또는 프로젝트에서 수행한 구체적인 역할과 성과에 대한 한국어 상세 설명 (1-3문장)\n"
+            "- category (string): 다음 4개 값 중 하나에 매핑 — 'career' (경력), 'study' (학업/교육), 'project' (프로젝트), 'award' (수상/자격증)\n\n"
+            "주의 사항:\n"
+            "1. 절대 날짜나 연도만 있고 상세 역할이 없는 빈 카드를 생성하지 마세요. 모든 카드는 명확한 title과 구체적인 description을 가져야 합니다.\n"
+            "2. 동일한 직무나 회사 내에서 기간별 상세 내역이 있다면, 하나의 통합된 경력 카드로 합치거나 각각 명확한 직함/내용을 기재하여 구분하세요.\n"
+            "3. 연도 순서대로 오래된 것부터 최신 순으로 정렬해 주세요.\n\n"
+            f"이력서 텍스트:\n---\n{resume_text[:12000]}\n---"
         )
 
         contents = [{"parts": [{"text": prompt}]}]
@@ -562,11 +597,12 @@ def parse_resume_text(resume_text: str) -> List[Dict[str, Any]]:
         if match:
             year = match.group(1)
             title_text = line.replace(year, "").strip(" -–—:·•|/")
-            if len(title_text) > 3:
+            # Filter out lines that are too short or only contain date indicators
+            if len(title_text) > 3 and not _is_date_only_text(title_text):
                 events.append({
                     "year": year,
                     "title": title_text[:120],
-                    "description": "",
+                    "description": f"{title_text}에서의 소중한 기록",
                     "category": "career",
                 })
     return events
