@@ -62,6 +62,8 @@ Manage your digital library privately and securely away from other guests.
 * **Axios Request Interceptor**: Every outbound API call automatically injects the active token (`Authorization: Bearer {token}`), ensuring all requests are authenticated.
 * **Strict Database Scoping**: All database operations (Category listings, Timeline queries, File uploads, and AI virtual galleries) are strictly scoped and bound using user authentication filters (`user_id == current_user.id`).
 * **Vector RAG Isolation**: Semantic search queries to the AI Docent retrieve exclusively the authenticated user's chunk data, guaranteeing no cross-user information leakage.
+* **Isolated Profile Timeline Management**: Users can manually add chronological milestones (career, education, project milestones, etc.) and delete them securely with a visual trash button scoped to their own active profile.
+* **Automatic Resume Import Timeline Sync**: When batch importing items from a resume, parsed milestones are automatically translated into profile history events using distinct category emojis (`🎓`, `💼`, `🏆`, `🌱`) and saved directly to the database.
 
 ---
 
@@ -139,11 +141,12 @@ npm run dev
 
 ### Automatic DB Migrations & Isolation Tests
 * **Schema Upgrades**: The backend checks SQLite tables automatically at startup. If missing, it adds `user_id` foreign keys to categories, archives, and exhibitions, backfilling existing records to the default admin user.
-* **Testing Isolation**: You can run backend automated multi-user logic and strict authentication verification tests using:
+* **Testing Isolation**: You can run backend automated multi-user logic, strict authentication verification tests, and timeline feature/sync tests using:
   ```bash
   cd backend
   python test_multi_user.py
   python test_auth_isolation.py
+  python test_timeline_features.py
   ```
 
 ---

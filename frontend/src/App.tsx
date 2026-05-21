@@ -127,7 +127,14 @@ const ProtectedAppLayout: React.FC<ProtectedLayoutProps> = ({ user, logout, refr
         {activeTab === 'dashboard' && <MainDashboard owner={user} onTimelineUpdate={refreshUser} />}
         {activeTab === 'archive' && <ArchiveGrid />}
         {activeTab === 'timeline' && <TimelineFlow owner={user} />}
-        {activeTab === 'resume' && <ResumeImporter onImported={() => setActiveTab('archive')} />}
+        {activeTab === 'resume' && (
+          <ResumeImporter
+            onImported={async () => {
+              await refreshUser()
+              setActiveTab('dashboard')
+            }}
+          />
+        )}
         {activeTab === 'insight' && <CareerInsight owner={user} />}
         {activeTab === 'exhibition' && <ExhibitionHall />}
       </main>

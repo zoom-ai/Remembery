@@ -264,6 +264,10 @@ export const userAPI = {
     const res = await API.post<User>('/users/timeline', data)
     return res.data
   },
+  deleteTimelineEvent: async (index: number) => {
+    const res = await API.delete<User>(`/users/timeline/${index}`)
+    return res.data
+  },
   updateOwner: async (data: UserProfileUpdate) => {
     const res = await API.patch<User>('/users/owner', data)
     return res.data

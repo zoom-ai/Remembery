@@ -58,6 +58,18 @@ def add_timeline_event(
     updated_owner = crud.add_timeline_event(db, current_user, payload)
     return updated_owner
 
+@router.delete("/timeline/{index}", response_model=schemas.UserResponse, summary="Delete an event from the owner's timeline")
+def delete_timeline_event(
+    index: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Removes a timeline event at the specified index from the current user's timeline_json array.
+    """
+    updated_owner = crud.delete_timeline_event(db, current_user, index)
+    return updated_owner
+
 @router.patch("/owner", response_model=schemas.UserResponse, summary="Update the main protagonist's profile")
 def update_owner_profile(
     payload: schemas.UserProfileUpdate,

@@ -102,6 +102,8 @@ Define adaptive metadata models for any type of archive (Papers, Sensory Diaries
 *   **Decoupled JWT Session Authentication**: Renders customizable entry cards for **Login** and **Signup**. Integrates a global React `AuthContext` utilizing browser `localStorage` sessions and secure automatic headers injection via an Axios request interceptor (`Authorization: Bearer {token}`).
 *   **Automatic SQLite Schema Upgrades & Backfills**: Runs on-the-fly table inspection (`PRAGMA table_info`) at backend startup to seamlessly append missing `user_id` foreign key columns and safely link legacy files to the protagonist.
 *   **Mathematical Multi-Tenant Isolation**: Locks down all category listings, file uploads, AI curations, RAG semantic search logs, and timeline events to the specific authenticated user (`user_id == current_user.id`), making cross-user data leakage absolutely impossible.
+*   **Isolated Timeline & Profile History Management**: Supports manual timeline event addition (`POST /api/users/timeline`) and index-based deletion (`DELETE /api/users/timeline/{index}`) securely scoped to the logged-in user session.
+*   **Automatic Resume-to-Timeline Sync**: When importing a resume via batch save (`POST /api/archive/batch`), parsed items are automatically mapped to chronological timeline events using distinct category emojis (`🎓`, `💼`, `🏆`, `🌱`) and appended directly to the user's isolated profile history (`User.timeline_json`).
 
 
 ---
@@ -223,6 +225,7 @@ Remembery leverages a robust, modern stack selected for durability, portability,
 - [x] **AI Resume Timeline Importer** supporting dual-input modes (text paste / PDF / DOCX / TXT file uploads) and a premium interactive preview/edit grid
 - [x] **AI Career Competency Radar Report** rendering a high-fidelity 5-axis Chart.js Radar visualization with personalized AI Docent commentary
 - [x] **Secure Multi-User Architecture** with JWT Authentication & Strict Database Scoping (FastAPI + JWT + React Context + Axios Interceptor)
+- [x] **Isolated Timeline & Automatic Resume Timeline Sync** (Manual timeline deletion/addition & automatic emoji mapping from resume imports)
 
 
 ---

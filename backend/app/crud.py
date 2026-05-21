@@ -41,6 +41,20 @@ def add_timeline_event(db: Session, owner: models.User, req: schemas.TimelineEve
     db.refresh(owner)
     return owner
 
+def delete_timeline_event(db: Session, owner: models.User, index: int) -> models.User:
+    current_timeline = owner.timeline_json or []
+    new_timeline = list(current_timeline)
+    if 0 <= index < len(new_timeline):
+        new_timeline.pop(index)
+    owner.timeline_json = new_timeline
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(owner, "timeline_json")
+    
+    db.commit()
+    db.refresh(owner)
+    return owner
+
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     db_user = models.User(
         email=user.email,

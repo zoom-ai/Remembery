@@ -7,9 +7,9 @@
 import { useState, useEffect } from 'react'
 import {
   Search, Loader2, Quote, Calendar,
-  Sparkles, ChevronRight, MessageCircle, X, Plus, Edit2, MapPin
+  Sparkles, ChevronRight, MessageCircle, X, Plus, Edit2, MapPin, Trash2
 } from 'lucide-react'
-import { aiAPI, archiveAPI, type RAGQueryResponse } from '../services/api'
+import { aiAPI, archiveAPI, userAPI, type RAGQueryResponse } from '../services/api'
 import TimelineModal from './TimelineModal'
 import ProfileEditModal from './ProfileEditModal'
 
@@ -28,6 +28,21 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [totalArchives, setTotalArchives] = useState<number | null>(null)
+  const [isDeletingIdx, setIsDeletingIdx] = useState<number | null>(null)
+
+  const handleDeleteTimeline = async (idx: number) => {
+    if (!window.confirm("이 연혁 항목을 삭제하시겠습니까?")) return
+    setIsDeletingIdx(idx)
+    try {
+      await userAPI.deleteTimelineEvent(idx)
+      onTimelineUpdate()
+    } catch (err) {
+      console.error("Failed to delete timeline event:", err)
+      alert("연혁 삭제에 실패했습니다.")
+    } finally {
+      setIsDeletingIdx(null)
+    }
+  }
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -284,11 +299,25 @@ export default function MainDashboard({ owner, onTimelineUpdate }: Props) {
                 </div>
                 <div className="museum-card rounded-xl px-5 py-4 flex items-center gap-4 group-hover:border-[var(--umber)]/30">
                   <span className="text-xl flex-shrink-0">{item.icon || '🌱'}</span>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <span className="text-xs font-semibold tracking-wider text-[var(--umber)] uppercase">{item.year}</span>
-                    <p className="text-sm text-[var(--charcoal)] mt-0.5 font-medium">{item.event}</p>
+                    <p className="text-sm text-[var(--charcoal)] mt-0.5 font-medium break-words">{item.event}</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-[var(--taupe)] ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTimeline(idx);
+                    }}
+                    disabled={isDeletingIdx === idx}
+                    className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="연혁 삭제"
+                  >
+                    {isDeletingIdx === idx ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--taupe)]" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
               </div>
             ))

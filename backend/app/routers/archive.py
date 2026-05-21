@@ -457,6 +457,42 @@ def batch_create_archive_items(
         db_item = crud.create_archive_item(db, item_schema)
         created_ids.append(db_item.id)
 
+    # Automatically sync resume events to User's timeline_json (Option A)
+    timeline_events_to_add = []
+    for item_input in request.items:
+        if item_input.source == "resume_import":
+            category = ""
+            if item_input.custom_attributes and isinstance(item_input.custom_attributes, dict):
+                category = item_input.custom_attributes.get("category", "")
+            if not category and item_input.tags:
+                category = item_input.tags
+            
+            icon = "🌱"
+            if category == "study":
+                icon = "🎓"
+            elif category == "career":
+                icon = "💼"
+            elif category == "award":
+                icon = "🏆"
+            elif category == "project":
+                icon = "🌱"
+                
+            timeline_events_to_add.append({
+                "year": item_input.original_date or "",
+                "event": item_input.title,
+                "icon": icon
+            })
+            
+    if timeline_events_to_add:
+        current_timeline = current_user.timeline_json or []
+        new_timeline = list(current_timeline)
+        new_timeline.extend(timeline_events_to_add)
+        current_user.timeline_json = new_timeline
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(current_user, "timeline_json")
+        db.commit()
+        db.refresh(current_user)
+
     return schemas.BatchArchiveResponse(
         created_count=len(created_ids),
         item_ids=created_ids,
